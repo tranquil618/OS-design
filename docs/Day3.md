@@ -1,9 +1,18 @@
-Day3:Loader加载Kernel与三级启动结构实现
-核心内容：完成并实现了Boot Sector -> Boot Loader -> Kernel
-新增模块：kernel/
+# Day3:Loader加载Kernel与三级启动结构实现
+
+## 核心内容
+
+完成并实现了Boot Sector -> Boot Loader -> Kernel
+
+## 新增模块
+
+kernel/
          └──kernel.asm
 修改loader，从显示L升级为读取kernel.bin,加载到0x10000，跳转执行
-遇到的问题：1.Loader大小只有39字节。原因：NASM不会自动补齐，
+
+## 遇到的问题
+
+1.Loader大小只有39字节。原因：NASM不会自动补齐，
 通过加入：times 510-($-$$) db 0
          dw 0xaa55
            2.0x10000地址问题

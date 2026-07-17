@@ -1,0 +1,5 @@
+# build files
+
+*.bin
+*.o
+*.img

@@ -1,13 +1,13 @@
-Day4：Kernel直接操作VGA显存
+# Day4：Kernel直接操作VGA显存
 
-完成内容：
+## 完成内容：
 
 1. 去除BIOS INT 10h依赖
 2. 使用0xB8000显存输出字符
 3. 实现字符颜色控制
 4. 实现clear_screen清屏函数
 
-技术点：
+## 技术点：
 
 - VGA Text Mode
 - ES段寄存器
@@ -15,6 +15,6 @@ Day4：Kernel直接操作VGA显存
 - 字符属性字节
 - 显存布局
 
-成果：
+## 成果：
 
 OrangeOS Kernel可以独立控制屏幕显示

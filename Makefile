@@ -10,7 +10,8 @@ QEMU=qemu-system-i386
 KERNEL_OBJS=\
 kernel/kernel.o \
 kernel/screen.o \
-kernel/print.o
+kernel/print.o \
+kernel/keyboard.o
 
 all: orange.img
 
@@ -28,6 +29,9 @@ kernel/screen.o: kernel/screen.asm
 
 kernel/print.o: kernel/print.asm
 	$(NASM) -f elf32 kernel/print.asm -o kernel/print.o
+
+kernel/keyboard.o:kernel/keyboard.asm
+	$(NASM) -f elf32 kernel/keyboard.asm -o kernel/keyboard.o
 
 kernel/kernel.bin: $(KERNEL_OBJS)
 	$(LD) -m elf_i386 \

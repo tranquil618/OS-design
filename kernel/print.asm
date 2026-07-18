@@ -4,10 +4,16 @@
 ;=================================
 
 [BITS 16]
+;声明外部函数
+
+;全局函数
 global print_string
 global print_color_string
 global put_char
-
+global set_cursor
+global newline
+;全局变量
+global cursor_pos
 ;---------------------------------
 ; print_string
 ; 功能:
@@ -36,6 +42,7 @@ print_string:
     jmp .loop
 
 .done:
+    mov [cursor_pos],di
     ret
 
 ;--------------------------------
@@ -67,6 +74,7 @@ print_color_string:
     jmp .color_loop
 
 .color_done:
+    mov [cursor_pos],di
     ret
 
 ;=================================
@@ -77,6 +85,15 @@ print_color_string:
 ; 在当前位置显示一个字符
 ;=================================
 put_char:
+
+    ;Enter
+    cmp al,0x0D
+    je do_newline
+
+    ;Backspace
+    cmp al,0x08
+    je do_backspace
+
     ;保存字符
     mov ah,al
     ;读取当前位置
@@ -93,5 +110,75 @@ put_char:
     mov [cursor_pos],bx
     ret
 
+do_newline:
+    call newline
+    ret
+
+
+
+;==============================
+; set_cursor
+; 输入:
+; BX = 显存偏移
+; 功能:
+; 设置当前输出位置
+;==============================
+set_cursor:
+    mov [cursor_pos],bx
+    ret
+
+;=================================
+; newline
+; 功能：光标移动到下一行开头
+;=================================
+newline:
+    mov ax,[cursor_pos]
+
+    ;计算当前列
+    mov dx,0
+    mov bx,160
+    div bx
+
+    ;AX=行号
+    ;DX=当前行剩余字节
+    
+    ;下一行
+    inc ax
+
+    ;行号*160
+    mul bx
+
+    mov [cursor_pos],ax
+    ret
+
+
+;=================================
+; do_backspace
+; 功能：实现Backspace的功能
+;=================================
+do_backspace:
+    mov bx,[cursor_pos]
+
+    ;防止删除到屏幕外
+    cmp bx,0
+    je backspace_done
+
+    ;后退一个字符
+    sub bx,2
+    ;删除字符
+    mov byte [es:bx],' '
+    ;恢复颜色
+    mov byte [es:bx+1],0x07
+    ;保存新位置
+    mov [cursor_pos],bx
+
+backspace_done:
+    ret
+
+
+
+;========================
+; Data
+;========================
 cursor_pos:
     dw 0

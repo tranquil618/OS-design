@@ -10,6 +10,7 @@ global _start
 extern clear_screen
 extern print_color_string
 extern put_char
+extern set_cursor
 extern get_key
 
 _start:
@@ -22,22 +23,21 @@ _start:
 
     call clear_screen
 
-    mov al,'A'
-    call put_char
-    mov al,'B'
-    call put_char
-    mov al,'C'
-    call put_char
-
     mov si,message      ;SI:Source Index，让SI指向字符串地址
     mov bx,colors       ;颜色表地址
     mov di,28*2         ;di表示显存偏移
+    
     call print_color_string
+    
 
-wait_key:
+;==========================
+;键盘循环
+;==========================
+keyboard_loop:
     call get_key
     call put_char
-    jmp wait_key
+    jmp keyboard_loop
+
 
 halt:
     jmp $

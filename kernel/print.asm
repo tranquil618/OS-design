@@ -12,8 +12,12 @@ global print_color_string
 global put_char
 global set_cursor
 global newline
+global set_terminal_start
 ;全局变量
 global cursor_pos
+global terminal_start
+
+;%include "../include/terminal.inc"
 ;---------------------------------
 ; print_string
 ; 功能:
@@ -160,7 +164,7 @@ do_backspace:
     mov bx,[cursor_pos]
 
     ;防止删除到屏幕外
-    cmp bx,0
+    cmp bx,[terminal_start]
     je backspace_done
 
     ;后退一个字符
@@ -175,10 +179,26 @@ do_backspace:
 backspace_done:
     ret
 
+;=================================
+; set_terminal_start
+; BX = 输入区域开始位置
+;=================================
+set_terminal_start:
+    mov [terminal_start],bx
+    mov [cursor_pos],bx
+    ret
 
 
 ;========================
 ; Data
 ;========================
+
+;========================
+; Terminal State
+;========================
+;当前光标位置
 cursor_pos:
+    dw 0
+;输入区域起始位置
+terminal_start:
     dw 0

@@ -1,17 +1,13 @@
 ;=================================
 ; kernel.asm
+; format: elf32
 ; OrangeOS Kernel入口
 ;=================================
 ;实际加载地址由ld决定
 [BITS 16]
 
 global _start
-
-extern clear_screen
-extern print_color_string
-extern put_char
-extern set_cursor
-extern get_key
+%include "kernel.inc"
 
 _start:
     ;设置数据段
@@ -28,6 +24,15 @@ _start:
     mov di,28*2         ;di表示显存偏移
     
     call print_color_string
+    ;换行
+    call newline
+    ;显示提示符
+    mov si,prompt
+    mov di,[cursor_pos]
+    call print_string
+    ;设置输入区域
+    mov bx,[cursor_pos]
+    call set_terminal_start
     
 
 ;==========================
@@ -35,6 +40,9 @@ _start:
 ;==========================
 keyboard_loop:
     call get_key
+    ;保存输入
+    call input_char
+    ;显示输入
     call put_char
     jmp keyboard_loop
 
@@ -45,6 +53,9 @@ halt:
 
 message:
     db 'OrangeOS Kernel Started!',0
+
+prompt:
+    db 'OrangeOS>',0
 
 colors:
     ;OrangeOS每个字母一个颜色

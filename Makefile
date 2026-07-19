@@ -3,6 +3,8 @@
 #=================================
 .PHONY: all run clean
 
+NASMFLAGS=-I include/ -f elf32
+
 NASM=nasm
 LD=ld
 QEMU=qemu-system-i386
@@ -11,7 +13,8 @@ KERNEL_OBJS=\
 kernel/kernel.o \
 kernel/screen.o \
 kernel/print.o \
-kernel/keyboard.o
+kernel/keyboard.o \
+kernel/input.o
 
 all: orange.img
 
@@ -22,16 +25,19 @@ loader/loader.bin: loader/loader.asm
 	$(NASM) loader/loader.asm -o loader/loader.bin
 
 kernel/kernel.o: kernel/kernel.asm
-	$(NASM) -f elf32 kernel/kernel.asm -o kernel/kernel.o
+	$(NASM) $(NASMFLAGS) kernel/kernel.asm -o kernel/kernel.o
 
 kernel/screen.o: kernel/screen.asm
-	$(NASM) -f elf32 kernel/screen.asm -o kernel/screen.o
+	$(NASM) $(NASMFLAGS) kernel/screen.asm -o kernel/screen.o
 
 kernel/print.o: kernel/print.asm
-	$(NASM) -f elf32 kernel/print.asm -o kernel/print.o
+	$(NASM) $(NASMFLAGS) kernel/print.asm -o kernel/print.o
 
 kernel/keyboard.o:kernel/keyboard.asm
-	$(NASM) -f elf32 kernel/keyboard.asm -o kernel/keyboard.o
+	$(NASM) $(NASMFLAGS) kernel/keyboard.asm -o kernel/keyboard.o
+
+kernel/input.o:kernel/input.asm
+	$(NASM) $(NASMFLAGS) kernel/input.asm -o kernel/input.o
 
 kernel/kernel.bin: $(KERNEL_OBJS)
 	$(LD) -m elf_i386 \

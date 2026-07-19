@@ -6,6 +6,7 @@
 
 global get_key
 
+;%include "../include/io.inc"
 ;---------------------------------
 ; get_key
 ; 功能：

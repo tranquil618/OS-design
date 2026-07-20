@@ -45,6 +45,7 @@ kernel/kernel.bin: $(KERNEL_OBJS)
 	$(KERNEL_OBJS) \
 	-o kernel/kernel.bin \
 	--oformat binary
+	truncate -s 4096 kernel/kernel.bin
 
 orange.img: \
 boot/boot.bin \

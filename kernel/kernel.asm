@@ -10,9 +10,16 @@ global _start
 %include "kernel.inc"
 
 _start:
-    ;设置数据段
+    ;在修改栈段期间关闭中断
+    cli
+    ;设置Kernel栈
     mov ax,0x1000
+    mov ss,ax
+    mov sp,0xFFFE
+    ;设置数据段
     mov ds,ax
+    ;栈设置完成，重新开启中断
+    sti
     ;设置显存段
     mov ax,0xb800      ;设置显存段
     mov es,ax

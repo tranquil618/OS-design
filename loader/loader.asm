@@ -1,4 +1,5 @@
 org 0x9000
+[BITS 16]
 
 ;设置Loader数据段
 mov ax,0x0000
@@ -21,16 +22,49 @@ mov dl,0x80       ;第一块硬盘
 int 0x13          ;调用BIOS磁盘读取
 
 jc disk_error      ;读取失败
-jmp 0x1000:0x0000 ;跳转执行kernel
+
+;开启A20地址线
+call enable_a20
+
+;关闭中断并加载GDT
+cli
+lgdt [gdt_descriptor]
+
+;设置CR0的PE位
+mov eax,cr0
+or eax,0x00000001
+mov cr0,eax
+
+;远跳转进入32位代码段
+jmp dword CODE_SELECTOR:protected_mode_entry
 
 
+
+
+;=================================
+; Disk Error
+;=================================
 disk_error:
-mov ah,0x0e        ;显示错误字符E
-mov al,'E'
+    mov ah,0x0e        ;显示错误字符E
+    mov al,'E'
 
-int 0x10
+    int 0x10
 
-jmp $
+    jmp $
+
+;=================================
+; 开启A20地址线
+; 使用Fast A20 Gate，端口0x92
+;=================================
+enable_a20:
+    in al,0x92        ;读取系统控制端口
+    ;确保不会触发Fast Reset
+    and al,11111110b  ;避免意外触发快速复位
+    ;将A20 Enable位置1
+    or al,00000010b
+
+    out 0x92,al       ;写回
+    ret
 
 ;=================================
 ; Global Descriptor Table
@@ -66,6 +100,40 @@ gdt_descriptor:
 
 CODE_SELECTOR equ gdt_code-gdt_start
 DATA_SELECTOR equ gdt_data-gdt_start
+
+;=================================
+; 32位保护模式入口
+;=================================
+[BITS 32]
+protected_mode_entry:
+    ;初始化数据段寄存器
+    mov ax,DATA_SELECTOR
+    mov ds,ax
+    mov es,ax
+    mov fs,ax
+    mov gs,ax
+    mov ss,ax
+
+    ;初始化32位栈
+    mov esp,0x90000
+    ;清空方向标志
+    cld
+    ;清空VGA文本屏幕
+    mov edi,0xB8000
+    mov ecx,2000
+    mov ax,0x0720
+    rep stosw
+    ;显示字符P
+    mov byte [0xB8000],'P'
+    mov byte [0xB8001],0x0A
+    ;显示字符M
+    mov byte [0xB8002],'M'
+    mov byte [0xB8003],0x0A
+
+.halt:
+    cli
+    hlt
+    jmp .halt
 
 times 510-($-$$) db 0
 

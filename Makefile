@@ -13,7 +13,10 @@ KERNEL_OBJS=\
 kernel/kernel32.o \
 kernel/screen32.o \
 kernel/print32.o \
-kernel/idt32.o
+kernel/idt32.o \
+kernel/pic32.o \
+kernel/timer32.o \
+kernel/keyboard32.o
 
 all: orange.img
 
@@ -49,6 +52,15 @@ kernel/print32.o: kernel/print32.asm
 
 kernel/idt32.o: kernel/idt32.asm
 	$(NASM) $(NASMFLAGS) kernel/idt32.asm -o kernel/idt32.o
+
+kernel/pic32.o: kernel/pic32.asm
+	$(NASM) $(NASMFLAGS) kernel/pic32.asm -o kernel/pic32.o
+
+kernel/timer32.o: kernel/timer32.asm
+	$(NASM) $(NASMFLAGS) kernel/timer32.asm -o kernel/timer32.o
+
+kernel/keyboard32.o: kernel/keyboard32.asm
+	$(NASM) $(NASMFLAGS) kernel/keyboard32.asm -o kernel/keyboard32.o
 
 kernel/kernel.bin: $(KERNEL_OBJS)
 	$(LD) -m elf_i386 \

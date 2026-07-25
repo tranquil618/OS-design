@@ -40,15 +40,19 @@ _start:
 
     ;初始化并加载IDT
     call idt_init32
+    ;初始化并重映射PIC
+    call pic_init32
+    ;初始化PIT时钟
+    call pit_init32
+    ;开启硬件中断
+    sti
 
-    ;测试IDT
-    int 0x80
+    ;开启硬件中断
 
-    ;测试0号CPU异常
-    mov eax,1
-    xor edx,edx
-    xor ecx,ecx
-    div ecx
+.idle:
+    ;等待下一次硬件中断
+    hlt
+    jmp .idle
 
 .halt:
     cli

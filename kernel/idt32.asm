@@ -6,6 +6,11 @@
 
 global idt_init32
 
+extern irq1_keyboard
+extern irq0_timer
+
+IRQ0_VECTOR equ 0x20
+IRQ1_VECTOR equ 0x21
 CODE_SELECTOR equ 0x08
 IDT_ENTRIES equ 256
 IDT_ENTRY_SIZE equ 8
@@ -19,20 +24,29 @@ section .text
 ; 建立int 0x80中断门并加载IDT
 ;=================================
 idt_init32:
-   ;安装0号除零异常处理程序
+    ;安装0号异常
     mov ebx,0x00
     mov eax,isr_divide_error
     call set_idt_gate32
 
-    ;安装0x80软件中断处理程序
+    ;安装int 0x80
     mov ebx,TEST_VECTOR
     mov eax,isr_test
     call set_idt_gate32
 
-    ;加载IDT
+    ;安装IRQ0
+    mov ebx,IRQ0_VECTOR
+    mov eax,irq0_timer
+    call set_idt_gate32
+
+    ;安装IRQ1键盘中断
+    mov ebx,IRQ1_VECTOR
+    mov eax,irq1_keyboard
+    call set_idt_gate32
+
     lidt [idt_descriptor]
     ret
-
+    
 ;=================================
 ; set_idt_gate32
 ; 输入：

@@ -116,24 +116,10 @@ protected_mode_entry:
 
     ;初始化32位栈
     mov esp,0x90000
-    ;清空方向标志
-    cld
-    ;清空VGA文本屏幕
-    mov edi,0xB8000
-    mov ecx,2000
-    mov ax,0x0720
-    rep stosw
-    ;显示字符P
-    mov byte [0xB8000],'P'
-    mov byte [0xB8001],0x0A
-    ;显示字符M
-    mov byte [0xB8002],'M'
-    mov byte [0xB8003],0x0A
 
-.halt:
-    cli
-    hlt
-    jmp .halt
+    ;跳转到物理地址0x10000的32位kernel
+    jmp dword CODE_SELECTOR:0x10000
+
 
 times 510-($-$$) db 0
 

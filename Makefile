@@ -10,11 +10,10 @@ LD=ld
 QEMU=qemu-system-i386
 
 KERNEL_OBJS=\
-kernel/kernel.o \
-kernel/screen.o \
-kernel/print.o \
-kernel/keyboard.o \
-kernel/input.o
+kernel/kernel32.o \
+kernel/screen32.o \
+kernel/print32.o \
+kernel/idt32.o
 
 all: orange.img
 
@@ -39,9 +38,21 @@ kernel/keyboard.o:kernel/keyboard.asm
 kernel/input.o:kernel/input.asm
 	$(NASM) $(NASMFLAGS) kernel/input.asm -o kernel/input.o
 
+kernel/kernel32.o: kernel/kernel32.asm include/kernel32.inc
+	$(NASM) $(NASMFLAGS) kernel/kernel32.asm -o kernel/kernel32.o
+
+kernel/screen32.o: kernel/screen32.asm
+	$(NASM) $(NASMFLAGS) kernel/screen32.asm -o kernel/screen32.o
+
+kernel/print32.o: kernel/print32.asm
+	$(NASM) $(NASMFLAGS) kernel/print32.asm -o kernel/print32.o
+
+kernel/idt32.o: kernel/idt32.asm
+	$(NASM) $(NASMFLAGS) kernel/idt32.asm -o kernel/idt32.o
+
 kernel/kernel.bin: $(KERNEL_OBJS)
 	$(LD) -m elf_i386 \
-	-Ttext 0 \
+	-Ttext 0x10000 \
 	$(KERNEL_OBJS) \
 	-o kernel/kernel.bin \
 	--oformat binary

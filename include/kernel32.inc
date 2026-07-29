@@ -32,3 +32,8 @@ extern pit_init32          ; 初始化PIT时钟
 ; Input
 ;----------------
 extern input_poll32         ; 检查并处理完整输入
+
+;----------------
+; Shell
+;----------------
+extern shell_prompt32          ; 显示Shell提示符

@@ -13,6 +13,8 @@ global input_buffer
 global input_length
 global command_ready
 
+%include "shell32.inc"
+
 BUFFER_SIZE equ 64
 VGA_MEMORY equ 0xB8000
 
@@ -122,14 +124,13 @@ input_poll32:
     cmp byte [command_ready],0
     je .done
 
-    ;在时钟旋转符号后显示R
-    mov byte [VGA_MEMORY+164],'R'
-    mov byte [VGA_MEMORY+165],0x0B
-
     ;清空缓冲区状态
     mov dword [input_length],0
     mov byte [input_buffer],0
     mov byte [command_ready],0
+    
+    ;为下一条命令显示提示符
+    call shell_prompt32
 
 .done:
     popfd

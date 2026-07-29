@@ -37,7 +37,8 @@ _start:
     mov esi,kernel_message
     mov edi,0xB8000
     call print_string32
-
+    ;显示Shell提示符
+    call shell_prompt32
     ;初始化并加载IDT
     call idt_init32
     ;初始化并重映射PIC

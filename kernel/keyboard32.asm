@@ -4,6 +4,8 @@
 ;=================================
 [BITS 32]
 global irq1_keyboard
+global keyboard_get_cursor32
+global keyboard_set_cursor32
 
 %include "input32.inc"
 
@@ -163,6 +165,32 @@ irq1_keyboard:
 
     popad
     iretd
+
+;=================================
+; keyboard_get_cursor32
+; 返回：
+; EAX = 输入区相对光标位置
+;=================================
+keyboard_get_cursor32:
+    mov eax,[keyboard_cursor]
+    ret
+
+
+;=================================
+; keyboard_set_cursor32
+; 输入：
+; EAX = 输入区相对光标位置
+;=================================
+keyboard_set_cursor32:
+    ;超过输入区域时回到起点
+    cmp eax,INPUT_AREA_SIZE
+    jb .save
+
+    xor eax,eax
+
+.save:
+    mov [keyboard_cursor],eax
+    ret
 
 keyboard_cursor:
     dd 0

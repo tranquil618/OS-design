@@ -12,7 +12,7 @@ mov bx,0x0000
 
 ;读取kernel
 mov ah,0x02       ;BIOS读取扇区
-mov al,8          ;读取8个扇区
+mov al,16         ;读取16个扇区
 ;设置CHS参数
 mov ch,0          ;第0柱面
 mov cl,3          ;第3扇区(kernel所在)

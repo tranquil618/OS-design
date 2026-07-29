@@ -48,7 +48,7 @@ irq0_timer:
 
     ;根据计数选择旋转符号
     mov eax,[timer_ticks]
-    ;每32次时钟中断才切换一次符号
+    ;每16次时钟中断才切换一次符号
     shr eax,4
     ;在四个符号之间循环
     and eax,0x03

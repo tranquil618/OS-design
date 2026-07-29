@@ -27,3 +27,8 @@ extern pic_init32          ; 初始化并重映射8259A PIC
 ; Timer
 ;----------------
 extern pit_init32          ; 初始化PIT时钟
+
+;----------------
+; Input
+;----------------
+extern input_poll32         ; 检查并处理完整输入

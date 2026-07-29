@@ -50,8 +50,10 @@ _start:
     ;开启硬件中断
 
 .idle:
-    ;等待下一次硬件中断
+    ;等待硬件中断
     hlt
+    ;处理中断产生的完整输入
+    call input_poll32
     jmp .idle
 
 .halt:

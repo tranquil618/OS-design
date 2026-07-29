@@ -5,6 +5,8 @@
 [BITS 32]
 global irq1_keyboard
 
+%include "input32.inc"
+
 KEYBOARD_DATA equ 0x60
 PIC1_COMMAND equ 0x20
 PIC_EOI equ 0x20
@@ -63,6 +65,14 @@ irq1_keyboard:
     test dl,dl
     jz .send_eoi
     
+    ;写入输入缓冲区
+    mov al,dl
+    call input_append32
+
+    ;缓冲区已满或正在等待处理时不显示
+    test eax,eax
+    jz .send_eoi
+
     ;读取当前键盘输出位置
     mov edi,[keyboard_cursor]
     ;在屏幕第三行显示字符
@@ -101,7 +111,13 @@ irq1_keyboard:
 ; Enter
 ;=================================
 .enter:
-    ;读取当前相对输入位置
+    ;提交当前输入缓冲区
+    call input_submit32
+
+    ;已有命令等待处理时不重复换行
+    test eax,eax
+    jz .send_eoi
+
     mov eax,[keyboard_cursor]
 
     ;计算当前行号
@@ -124,19 +140,18 @@ irq1_keyboard:
 ; Backspace
 ;=================================
 .backspace:
+    ;先删除输入缓冲区字符
+    call input_backspace32
+    ;缓冲区没有字符时不删除屏幕内容
+    test eax,eax
+    jz .send_eoi
     mov edi,[keyboard_cursor]
-
-    ;输入区域起点不能继续删除
-    cmp edi,0
-    je .send_eoi
-
     ;向前移动一个字符
     sub edi,2
-
     ;使用空格覆盖原字符
     mov byte [VGA_MEMORY+INPUT_START+edi],' '
     mov byte [VGA_MEMORY+INPUT_START+edi+1],0x07
-
+    ;保存新的光标位置
     mov [keyboard_cursor],edi
     jmp .send_eoi
 

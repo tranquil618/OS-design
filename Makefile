@@ -16,7 +16,8 @@ kernel/print32.o \
 kernel/idt32.o \
 kernel/pic32.o \
 kernel/timer32.o \
-kernel/keyboard32.o
+kernel/keyboard32.o \
+kernel/input32.o 
 
 all: orange.img
 
@@ -59,8 +60,11 @@ kernel/pic32.o: kernel/pic32.asm
 kernel/timer32.o: kernel/timer32.asm
 	$(NASM) $(NASMFLAGS) kernel/timer32.asm -o kernel/timer32.o
 
-kernel/keyboard32.o: kernel/keyboard32.asm
+kernel/keyboard32.o: kernel/keyboard32.asm include/input32.inc
 	$(NASM) $(NASMFLAGS) kernel/keyboard32.asm -o kernel/keyboard32.o
+	
+kernel/input32.o: kernel/input32.asm
+	$(NASM) $(NASMFLAGS) kernel/input32.asm -o kernel/input32.o
 
 kernel/kernel.bin: $(KERNEL_OBJS)
 	$(LD) -m elf_i386 \

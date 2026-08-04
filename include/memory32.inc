@@ -1,0 +1,6 @@
+; OrangeOS memory information API
+extern memory_get_info32
+extern memory_init32
+extern memory_alloc_page32
+extern memory_alloc_info32
+extern memory_get_limit32

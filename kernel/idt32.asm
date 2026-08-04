@@ -29,6 +29,11 @@ idt_init32:
     mov eax,isr_divide_error
     call set_idt_gate32
 
+    ; Install the page-fault exception handler (vector 14).
+    mov ebx,0x0E
+    mov eax,isr_page_fault
+    call set_idt_gate32
+
     ;安装int 0x80
     mov ebx,TEST_VECTOR
     mov eax,isr_test
@@ -97,6 +102,42 @@ isr_divide_error:
     jmp .halt
 
 ;=================================
+; Page Fault (vector 14)
+; CPU pushes an error code before entering this handler.
+;=================================
+isr_page_fault:
+    cli
+    pushad
+
+    mov esi,page_fault_message
+    mov edi,0xB8000+320
+.print_message:
+    lodsb
+    test al,al
+    jz .print_address
+    mov byte [edi],al
+    mov byte [edi+1],0x0C
+    add edi,2
+    jmp .print_message
+
+.print_address:
+    mov eax,cr2
+    mov ecx,8
+.hex_digit:
+    rol eax,4
+    mov edx,eax
+    and edx,0x0F
+    mov dl,[page_fault_hex+edx]
+    mov byte [edi],dl
+    mov byte [edi+1],0x0C
+    add edi,2
+    loop .hex_digit
+
+.page_fault_halt:
+    hlt
+    jmp .page_fault_halt
+
+;=================================
 ; int 0x80测试处理函数
 ;=================================
 isr_test:
@@ -110,6 +151,11 @@ isr_test:
     popad
     ;从32位中断返回
     iretd
+
+page_fault_message:
+    db 'PAGE FAULT CR2=0x',0
+page_fault_hex:
+    db '0123456789ABCDEF'
 
 ;=================================
 ; Interrupt Descriptor Table

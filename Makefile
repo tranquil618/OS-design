@@ -18,6 +18,10 @@ kernel/pic32.o \
 kernel/timer32.o \
 kernel/keyboard32.o \
 kernel/input32.o \
+kernel/memory32.o \
+kernel/paging32.o \
+kernel/process32.o \
+kernel/filesystem32.o \
 kernel/shell32.o
 
 all: orange.img
@@ -67,7 +71,19 @@ kernel/keyboard32.o: kernel/keyboard32.asm include/input32.inc
 kernel/input32.o: kernel/input32.asm include/shell32.inc
 	$(NASM) $(NASMFLAGS) kernel/input32.asm -o kernel/input32.o
 
-kernel/shell32.o: kernel/shell32.asm include/keyboard32.inc
+kernel/memory32.o: kernel/memory32.asm
+	$(NASM) $(NASMFLAGS) kernel/memory32.asm -o kernel/memory32.o
+
+kernel/paging32.o: kernel/paging32.asm include/memory32.inc
+	$(NASM) $(NASMFLAGS) kernel/paging32.asm -o kernel/paging32.o
+
+kernel/process32.o: kernel/process32.asm
+	$(NASM) $(NASMFLAGS) kernel/process32.asm -o kernel/process32.o
+
+kernel/filesystem32.o: kernel/filesystem32.asm
+	$(NASM) $(NASMFLAGS) kernel/filesystem32.asm -o kernel/filesystem32.o
+
+kernel/shell32.o: kernel/shell32.asm include/keyboard32.inc include/filesystem32.inc include/memory32.inc include/process32.inc
 	$(NASM) $(NASMFLAGS) kernel/shell32.asm -o kernel/shell32.o
 
 kernel/kernel.bin: $(KERNEL_OBJS)

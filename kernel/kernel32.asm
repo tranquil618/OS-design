@@ -6,6 +6,9 @@
 
 global _start
 %include "kernel32.inc"
+extern process_init32
+extern memory_init32
+extern paging_init32
 
 ;CODE_SELECTOR equ 0x08
 DATA_SELECTOR equ 0x10
@@ -45,6 +48,12 @@ _start:
     call pic_init32
     ;初始化PIT时钟
     call pit_init32
+    ; Initialize the physical 4 KB page allocator from the E820 map.
+    call memory_init32
+    ; Build identity page tables and enable CR0.PG.
+    call paging_init32
+    ; Initialize the process control block table.
+    call process_init32
     ;开启硬件中断
     sti
 

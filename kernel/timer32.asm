@@ -7,6 +7,8 @@
 global pit_init32
 global irq0_timer
 
+extern scheduler_switch32
+
 PIT_COMMAND equ 0x43
 PIT_CHANNEL0 equ 0x40
 PIC1_COMMAND equ 0x20
@@ -61,6 +63,11 @@ irq0_timer:
     ;向主PIC发送EOI
     mov al,PIC_EOI
     out PIC1_COMMAND,al
+
+    ; Select the register frame that should resume after this IRQ.
+    mov eax,esp
+    call scheduler_switch32
+    mov esp,eax
 
     popad
     iretd

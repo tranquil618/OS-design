@@ -7,6 +7,8 @@ global irq1_keyboard
 global keyboard_get_cursor32
 global keyboard_set_cursor32
 
+extern scroll_input32
+
 %include "input32.inc"
 
 KEYBOARD_DATA equ 0x60
@@ -135,7 +137,8 @@ irq1_keyboard:
     cmp edi,INPUT_AREA_SIZE
     jb .save_cursor
 
-    xor edi,edi
+    call scroll_input32
+    mov edi,INPUT_AREA_SIZE-160
     jmp .save_cursor
 
 ;=================================

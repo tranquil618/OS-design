@@ -4,6 +4,7 @@
 ;=================================
 [BITS 32]
 global clear_screen32
+global scroll_input32
 
 VGA_MEMORY equ 0xB8000
 SCREEN_SIZE equ 80*25
@@ -28,6 +29,30 @@ clear_screen32:
 
     ;回复调用者寄存器
     pop edi
+    pop ecx
+    pop eax
+    ret
+
+; Scroll rows 3-25 upward while preserving the two status rows.
+scroll_input32:
+    push eax
+    push ecx
+    push esi
+    push edi
+
+    cld
+    mov esi,VGA_MEMORY+480
+    mov edi,VGA_MEMORY+320
+    mov ecx,22*80
+    rep movsw
+
+    mov edi,VGA_MEMORY+320+22*160
+    mov ecx,80
+    mov ax,DEFAULT_CELL
+    rep stosw
+
+    pop edi
+    pop esi
     pop ecx
     pop eax
     ret

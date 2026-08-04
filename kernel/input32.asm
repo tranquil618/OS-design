@@ -124,7 +124,10 @@ input_poll32:
     cmp byte [command_ready],0
     je .done
 
-    ;清空缓冲区状态
+    ;先执行命令，再清空缓冲区状态
+    mov esi,input_buffer
+    call shell_execute32
+
     mov dword [input_length],0
     mov byte [input_buffer],0
     mov byte [command_ready],0

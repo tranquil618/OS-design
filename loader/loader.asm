@@ -5,6 +5,32 @@ org 0x9000
 mov ax,0x0000
 mov ds,ax
 
+; Ask BIOS for conventional memory size (KB) and pass it to the kernel.
+int 0x12
+mov [0x0500],ax
+
+; Collect up to 16 BIOS E820 memory-map entries at 0x0508.
+xor ax,ax
+mov es,ax
+xor ebx,ebx
+mov di,0x0508
+mov dword [0x0504],0
+.e820_next:
+mov eax,0xE820
+mov edx,0x534D4150
+mov ecx,20
+int 0x15
+jc .e820_done
+cmp eax,0x534D4150
+jne .e820_done
+inc dword [0x0504]
+add di,20
+cmp dword [0x0504],16
+jae .e820_done
+test ebx,ebx
+jnz .e820_next
+.e820_done:
+
 ;设置Kernel加载段
 mov ax,0x1000
 mov es,ax

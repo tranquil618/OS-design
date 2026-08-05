@@ -20,7 +20,14 @@ kernel/keyboard32.o \
 kernel/input32.o \
 kernel/memory32.o \
 kernel/paging32.o \
+kernel/heap32.o \
+kernel/monitor32.o \
+kernel/power32.o \
+kernel/syscall32.o \
+kernel/rtc32.o \
+kernel/selftest32.o \
 kernel/process32.o \
+kernel/ata32.o \
 kernel/filesystem32.o \
 kernel/shell32.o
 
@@ -77,13 +84,34 @@ kernel/memory32.o: kernel/memory32.asm
 kernel/paging32.o: kernel/paging32.asm include/memory32.inc
 	$(NASM) $(NASMFLAGS) kernel/paging32.asm -o kernel/paging32.o
 
+kernel/heap32.o: kernel/heap32.asm include/memory32.inc
+	$(NASM) $(NASMFLAGS) kernel/heap32.asm -o kernel/heap32.o
+
+kernel/monitor32.o: kernel/monitor32.asm
+	$(NASM) $(NASMFLAGS) kernel/monitor32.asm -o kernel/monitor32.o
+
+kernel/power32.o: kernel/power32.asm
+	$(NASM) $(NASMFLAGS) kernel/power32.asm -o kernel/power32.o
+
+kernel/syscall32.o: kernel/syscall32.asm
+	$(NASM) $(NASMFLAGS) kernel/syscall32.asm -o kernel/syscall32.o
+
+kernel/rtc32.o: kernel/rtc32.asm
+	$(NASM) $(NASMFLAGS) kernel/rtc32.asm -o kernel/rtc32.o
+
+kernel/selftest32.o: kernel/selftest32.asm
+	$(NASM) $(NASMFLAGS) kernel/selftest32.asm -o kernel/selftest32.o
+
 kernel/process32.o: kernel/process32.asm
 	$(NASM) $(NASMFLAGS) kernel/process32.asm -o kernel/process32.o
 
-kernel/filesystem32.o: kernel/filesystem32.asm
+kernel/ata32.o: kernel/ata32.asm
+	$(NASM) $(NASMFLAGS) kernel/ata32.asm -o kernel/ata32.o
+
+kernel/filesystem32.o: kernel/filesystem32.asm include/ata32.inc
 	$(NASM) $(NASMFLAGS) kernel/filesystem32.asm -o kernel/filesystem32.o
 
-kernel/shell32.o: kernel/shell32.asm include/keyboard32.inc include/filesystem32.inc include/memory32.inc include/process32.inc
+kernel/shell32.o: kernel/shell32.asm include/keyboard32.inc include/filesystem32.inc include/memory32.inc include/process32.inc include/heap32.inc include/monitor32.inc include/power32.inc include/syscall32.inc include/rtc32.inc include/selftest32.inc
 	$(NASM) $(NASMFLAGS) kernel/shell32.asm -o kernel/shell32.o
 
 kernel/kernel.bin: $(KERNEL_OBJS)
@@ -92,7 +120,8 @@ kernel/kernel.bin: $(KERNEL_OBJS)
 	$(KERNEL_OBJS) \
 	-o kernel/kernel.bin \
 	--oformat binary
-	truncate -s 8192 kernel/kernel.bin
+	test $$(stat -c%s kernel/kernel.bin) -le 16384
+	truncate -s 16384 kernel/kernel.bin
 
 orange.img: \
 boot/boot.bin \
@@ -102,6 +131,7 @@ kernel/kernel.bin
 	loader/loader.bin \
 	kernel/kernel.bin \
 	> orange.img
+	truncate -s 1048576 orange.img
 
 
 run: orange.img

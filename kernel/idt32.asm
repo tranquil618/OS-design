@@ -8,6 +8,7 @@ global idt_init32
 
 extern irq1_keyboard
 extern irq0_timer
+extern isr_syscall32
 
 IRQ0_VECTOR equ 0x20
 IRQ1_VECTOR equ 0x21
@@ -36,8 +37,10 @@ idt_init32:
 
     ;安装int 0x80
     mov ebx,TEST_VECTOR
-    mov eax,isr_test
+    mov eax,isr_syscall32
     call set_idt_gate32
+    ; Permit future ring-3 callers to invoke only the system-call gate.
+    mov byte [idt_table+TEST_VECTOR*IDT_ENTRY_SIZE+5],11101110b
 
     ;安装IRQ0
     mov ebx,IRQ0_VECTOR

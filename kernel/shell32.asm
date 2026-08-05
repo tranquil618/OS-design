@@ -8,6 +8,12 @@ global shell_execute32
 %include "filesystem32.inc"
 %include "memory32.inc"
 %include "process32.inc"
+%include "heap32.inc"
+%include "monitor32.inc"
+%include "power32.inc"
+%include "syscall32.inc"
+%include "rtc32.inc"
+%include "selftest32.inc"
 
 extern print_string32
 extern clear_screen32
@@ -88,19 +94,119 @@ shell_execute32:
     test eax, eax
     jnz .fault
 
+    mov esi, ebx
+    mov edi, command_malloc
+    call string_equal32
+    test eax, eax
+    jnz .heap_alloc
+
+    mov esi, ebx
+    mov edi, command_free
+    call string_equal32
+    test eax, eax
+    jnz .heap_free
+
+    mov esi, ebx
+    mov edi, command_monitor
+    call string_equal32
+    test eax, eax
+    jnz .monitor
+
+    mov esi, ebx
+    mov edi, command_dealloc
+    call string_equal32
+    test eax, eax
+    jnz .dealloc
+
+    mov esi, ebx
+    mov edi, command_reboot
+    call string_equal32
+    test eax, eax
+    jnz .reboot
+
+    mov esi, ebx
+    mov edi, command_shutdown
+    call string_equal32
+    test eax, eax
+    jnz .shutdown
+
+    mov esi, ebx
+    mov edi, command_syscall
+    call string_equal32
+    test eax, eax
+    jnz .syscall
+
+    mov esi, ebx
+    mov edi, command_date
+    call string_equal32
+    test eax, eax
+    jnz .date
+
+    mov esi, ebx
+    mov edi, command_selftest
+    call string_equal32
+    test eax, eax
+    jnz .selftest
+
     ; Commands beginning with "cat " pass the remaining text as a filename.
     cmp byte [ebx], 'c'
-    jne .check_write
+    jne .check_touch
     cmp byte [ebx+1], 'a'
-    jne .check_write
+    jne .check_touch
     cmp byte [ebx+2], 't'
-    jne .check_write
+    jne .check_touch
     cmp byte [ebx+3], ' '
-    jne .check_write
+    jne .check_touch
     lea esi, [ebx+4]
     call fs_cat32
     test eax, eax
     jz .file_not_found
+    call shell_print_line32
+    jmp .done
+
+.check_touch:
+    cmp byte [ebx],'t'
+    jne .check_rm
+    cmp byte [ebx+1],'o'
+    jne .check_rm
+    cmp byte [ebx+2],'u'
+    jne .check_rm
+    cmp byte [ebx+3],'c'
+    jne .check_rm
+    cmp byte [ebx+4],'h'
+    jne .check_rm
+    cmp byte [ebx+5],' '
+    jne .check_rm
+    lea esi,[ebx+6]
+    call fs_create32
+    cmp eax,1
+    je .file_created
+    cmp eax,2
+    je .file_exists
+    mov esi,message_create_failed
+    call shell_print_line32
+    jmp .done
+.file_created:
+    mov esi,message_file_created
+    call shell_print_line32
+    jmp .done
+.file_exists:
+    mov esi,message_file_exists
+    call shell_print_line32
+    jmp .done
+
+.check_rm:
+    cmp byte [ebx],'r'
+    jne .check_write
+    cmp byte [ebx+1],'m'
+    jne .check_write
+    cmp byte [ebx+2],' '
+    jne .check_write
+    lea esi,[ebx+3]
+    call fs_delete32
+    test eax,eax
+    jz .file_not_found
+    mov esi,message_file_deleted
     call shell_print_line32
     jmp .done
 
@@ -148,7 +254,11 @@ shell_execute32:
     call shell_print_line32
     jmp .done
 .help:
-    mov esi, message_help
+    mov esi, message_help_core
+    call shell_print_line32
+    mov esi, message_help_memory
+    call shell_print_line32
+    mov esi, message_help_system
     call shell_print_line32
     jmp .done
 .info:
@@ -179,6 +289,40 @@ shell_execute32:
 .fault:
     ; Deliberately access an unmapped address to test vector 14.
     mov byte [0x40000000], 0
+    jmp .done
+.heap_alloc:
+    call heap_alloc_info32
+    call shell_print_line32
+    jmp .done
+.heap_free:
+    call heap_free_info32
+    call shell_print_line32
+    jmp .done
+.monitor:
+    call monitor_get_info32
+    call shell_print_line32
+    jmp .done
+.dealloc:
+    call memory_free_info32
+    call shell_print_line32
+    jmp .done
+.reboot:
+    call system_reboot32
+    jmp .done
+.shutdown:
+    call system_shutdown32
+    jmp .done
+.syscall:
+    call syscall_get_info32
+    call shell_print_line32
+    jmp .done
+.date:
+    call rtc_get_info32
+    call shell_print_line32
+    jmp .done
+.selftest:
+    call selftest_run32
+    call shell_print_line32
     jmp .done
 .file_not_found:
     mov esi, message_file_not_found
@@ -253,9 +397,24 @@ command_mem:      db 'mem', 0
 command_task:     db 'task', 0
 command_alloc:    db 'alloc', 0
 command_fault:    db 'fault', 0
-message_help:     db 'Commands: help info clear mem alloc task ls cat write fault', 0
+command_malloc:   db 'malloc', 0
+command_free:     db 'free', 0
+command_monitor:  db 'monitor', 0
+command_dealloc:  db 'dealloc', 0
+command_reboot:   db 'reboot', 0
+command_shutdown: db 'shutdown', 0
+command_syscall:  db 'syscall',0
+command_date:     db 'date',0
+command_selftest: db 'selftest',0
+message_help_core:   db 'Core: help info clear date monitor task syscall selftest',0
+message_help_memory: db 'Memory: mem alloc dealloc malloc free',0
+message_help_system: db 'Files: ls cat write touch rm | Power: reboot shutdown | Debug: fault',0
 message_info:     db 'OrangeOS 32-bit Protected Mode + Paging', 0
 message_unknown:  db 'Unknown command', 0
 message_file_not_found: db 'File not found', 0
 message_write_ok: db 'File updated', 0
 message_write_usage: db 'Usage: write <file> <text>', 0
+message_file_created: db 'File created',0
+message_file_exists: db 'File already exists',0
+message_create_failed: db 'Invalid name or directory full',0
+message_file_deleted: db 'File deleted',0

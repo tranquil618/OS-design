@@ -9,6 +9,8 @@ global _start
 extern process_init32
 extern memory_init32
 extern paging_init32
+extern fs_init32
+extern heap_init32
 
 ;CODE_SELECTOR equ 0x08
 DATA_SELECTOR equ 0x10
@@ -52,6 +54,10 @@ _start:
     call memory_init32
     ; Build identity page tables and enable CR0.PG.
     call paging_init32
+    ; Create the first-fit kernel heap.
+    call heap_init32
+    ; Load or create the persistent OrangeFS data sector.
+    call fs_init32
     ; Initialize the process control block table.
     call process_init32
     ;开启硬件中断

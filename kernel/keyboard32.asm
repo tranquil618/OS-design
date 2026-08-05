@@ -28,6 +28,17 @@ irq1_keyboard:
     ;读取键盘扫描码
     in al,KEYBOARD_DATA
     ;处理左Shift释放
+    cmp al,0xE0
+    je .extended_prefix
+    cmp byte [extended_state],0
+    je .normal_scan
+    mov byte [extended_state],0
+    cmp al,0x48
+    je .history_up
+    cmp al,0x50
+    je .history_down
+    jmp .send_eoi
+.normal_scan:
     cmp al,0xAA
     je .left_shift_release
 
@@ -91,6 +102,52 @@ irq1_keyboard:
 
 .save_cursor:
     mov [keyboard_cursor],edi
+    jmp .send_eoi
+
+.extended_prefix:
+    mov byte [extended_state],1
+    jmp .send_eoi
+
+.history_up:
+    mov ebx,[input_length]
+    call input_history_up32
+    jmp .history_redraw
+.history_down:
+    mov ebx,[input_length]
+    call input_history_down32
+.history_redraw:
+    test edx,edx
+    jz .send_eoi
+    mov ecx,eax
+    mov edi,[keyboard_cursor]
+    shl ebx,1
+    sub edi,ebx
+    mov edx,edi
+    push ecx
+    mov ecx,ebx
+    shr ecx,1
+.clear_old:
+    test ecx,ecx
+    jz .draw_history
+    mov byte [VGA_MEMORY+INPUT_START+edx],' '
+    mov byte [VGA_MEMORY+INPUT_START+edx+1],0x07
+    add edx,2
+    dec ecx
+    jmp .clear_old
+.draw_history:
+    pop ecx
+    mov edx,edi
+.draw_character:
+    test ecx,ecx
+    jz .history_done
+    lodsb
+    mov byte [VGA_MEMORY+INPUT_START+edx],al
+    mov byte [VGA_MEMORY+INPUT_START+edx+1],0x0F
+    add edx,2
+    dec ecx
+    jmp .draw_character
+.history_done:
+    mov [keyboard_cursor],edx
     jmp .send_eoi
 
 ;=================================
@@ -202,6 +259,8 @@ keyboard_cursor:
 ;Bit 0=左Shift
 ;Bit 1=右Shift
 shift_state:
+    db 0
+extended_state:
     db 0
 ;=================================
 ; Scan Code Set 1基础映射表

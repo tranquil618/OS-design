@@ -6,6 +6,9 @@ global memory_init32
 global memory_alloc_page32
 global memory_alloc_info32
 global memory_get_limit32
+global memory_get_free_pages32
+global memory_free_page32
+global memory_free_info32
 
 BOOT_MEMORY_KB  equ 0x0500
 E820_COUNT      equ 0x0504
@@ -23,6 +26,8 @@ memory_init32:
     mov dword [page_next], 0
     mov dword [page_limit], 0
     mov dword [free_pages], 0
+    mov dword [recycled_head], 0
+    mov dword [last_page_allocation], 0
     xor ebx, ebx
     mov ecx, [E820_COUNT]
     cmp ecx, 16
@@ -59,6 +64,7 @@ memory_init32:
     jbe .next
     mov ebx, eax
     mov [page_next], edx
+    mov [managed_start], edx
     add eax, edx
     and eax, 0xFFFFF000
     mov [page_limit], eax
@@ -79,6 +85,16 @@ memory_alloc_page32:
     pushfd
     cli
     push edx
+    mov eax,[recycled_head]
+    test eax,eax
+    jz .use_new_page
+    mov edx,[eax]
+    mov [recycled_head],edx
+    dec dword [free_pages]
+    pop edx
+    popfd
+    ret
+.use_new_page:
     mov eax, [page_next]
     test eax, eax
     jz .failed
@@ -97,9 +113,38 @@ memory_alloc_page32:
     popfd
     ret
 
+; EAX=page address. Return EAX=1 on success, otherwise zero.
+memory_free_page32:
+    pushfd
+    cli
+    push ebx
+    mov ebx,eax
+    test ebx,PAGE_SIZE-1
+    jnz .free_failed
+    cmp ebx,[managed_start]
+    jb .free_failed
+    cmp ebx,[page_limit]
+    jae .free_failed
+    mov eax,[recycled_head]
+    mov [ebx],eax
+    mov [recycled_head],ebx
+    inc dword [free_pages]
+    mov eax,1
+    pop ebx
+    popfd
+    ret
+.free_failed:
+    xor eax,eax
+    pop ebx
+    popfd
+    ret
 ; Return the exclusive upper bound of managed physical memory in EAX.
 memory_get_limit32:
     mov eax, [page_limit]
+    ret
+
+memory_get_free_pages32:
+    mov eax,[free_pages]
     ret
 
 ; Return ESI pointing to a summary built from BIOS boot information.
@@ -153,6 +198,7 @@ memory_alloc_info32:
     pushad
     call memory_alloc_page32
     mov edx, eax
+    mov [last_page_allocation],eax
     mov edi, allocation_buffer
     test edx, edx
     jz .no_memory
@@ -169,6 +215,34 @@ memory_alloc_info32:
 .ready:
     popad
     mov esi, allocation_buffer
+    ret
+
+memory_free_info32:
+    pushad
+    mov edi,allocation_buffer
+    mov eax,[last_page_allocation]
+    test eax,eax
+    jz .nothing
+    call memory_free_page32
+    test eax,eax
+    jz .failed
+    mov dword [last_page_allocation],0
+    mov esi,free_page_ok
+    call append_string32
+    mov byte [edi],0
+    jmp .ready
+.nothing:
+    mov esi,free_page_none
+    call append_string32
+    mov byte [edi],0
+    jmp .ready
+.failed:
+    mov esi,free_page_failed
+    call append_string32
+    mov byte [edi],0
+.ready:
+    popad
+    mov esi,allocation_buffer
     ret
 
 ; Append the zero-terminated string at ESI to EDI.
@@ -238,6 +312,9 @@ memory_suffix:        db ' MB free=', 0
 memory_pages_suffix:  db ' pages', 0
 allocation_prefix:    db 'Allocated page: 0x', 0
 allocation_failed:    db 'Out of physical memory', 0
+free_page_ok:          db 'Last physical page released', 0
+free_page_none:        db 'No physical page to release', 0
+free_page_failed:      db 'Physical page release failed', 0
 hex_digits:           db '0123456789ABCDEF'
 memory_buffer:        times 64 db 0
 allocation_buffer:    times 40 db 0
@@ -246,3 +323,6 @@ align 4
 page_next:  dd 0
 page_limit: dd 0
 free_pages: dd 0
+managed_start: dd 0
+recycled_head: dd 0
+last_page_allocation: dd 0

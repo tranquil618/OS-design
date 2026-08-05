@@ -6,6 +6,7 @@
 
 global pit_init32
 global irq0_timer
+global timer_get_ticks32
 
 extern scheduler_switch32
 
@@ -71,6 +72,10 @@ irq0_timer:
 
     popad
     iretd
+
+timer_get_ticks32:
+    mov eax,[timer_ticks]
+    ret
 
 
 timer_ticks:

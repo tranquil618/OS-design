@@ -7,6 +7,8 @@ global irq1_keyboard
 global keyboard_get_cursor32
 global keyboard_set_cursor32
 
+extern monitor_keyboard32
+
 extern scroll_input32
 
 %include "input32.inc"
@@ -27,6 +29,11 @@ irq1_keyboard:
 
     ;读取键盘扫描码
     in al,KEYBOARD_DATA
+    mov bl,al
+    call monitor_keyboard32
+    test eax,eax
+    jnz .send_eoi
+    mov al,bl
     ;处理左Shift释放
     cmp al,0xE0
     je .extended_prefix

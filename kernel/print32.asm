@@ -18,6 +18,11 @@ print_string32:
     test al,al
     jz .done
 
+    ; Mirror printable kernel text to the Bochs/QEMU debug console.  Real
+    ; hardware simply ignores this diagnostic port, while automated boot
+    ; tests can observe progress without scraping VGA memory.
+    out 0xE9,al
+
     mov byte [edi],al
     mov byte [edi+1],0x0A
     add edi,2

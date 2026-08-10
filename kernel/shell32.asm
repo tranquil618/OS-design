@@ -14,6 +14,7 @@ global shell_execute32
 %include "syscall32.inc"
 %include "rtc32.inc"
 %include "selftest32.inc"
+%include "usermode32.inc"
 
 extern print_string32
 extern clear_screen32
@@ -77,10 +78,34 @@ shell_execute32:
     jnz .mem
 
     mov esi, ebx
+    mov edi, command_memmap
+    call string_equal32
+    test eax, eax
+    jnz .memmap
+
+    mov esi, ebx
     mov edi, command_task
     call string_equal32
     test eax, eax
     jnz .task
+
+    mov esi, ebx
+    mov edi, command_ps
+    call string_equal32
+    test eax, eax
+    jnz .ps
+
+    mov esi, ebx
+    mov edi, command_run
+    call string_equal32
+    test eax, eax
+    jnz .run_user
+
+    mov esi, ebx
+    mov edi, command_runfault
+    call string_equal32
+    test eax, eax
+    jnz .run_fault
 
     mov esi, ebx
     mov edi, command_alloc
@@ -113,6 +138,12 @@ shell_execute32:
     jnz .monitor
 
     mov esi, ebx
+    mov edi, command_status
+    call string_equal32
+    test eax, eax
+    jnz .status
+
+    mov esi, ebx
     mov edi, command_dealloc
     call string_equal32
     test eax, eax
@@ -142,12 +173,103 @@ shell_execute32:
     test eax, eax
     jnz .date
 
+    mov esi,ebx
+    mov edi,command_disk
+    call string_equal32
+    test eax,eax
+    jnz .disk
+
     mov esi, ebx
     mov edi, command_selftest
     call string_equal32
     test eax, eax
     jnz .selftest
 
+    mov esi, ebx
+    mov edi, command_user
+    call string_equal32
+    test eax, eax
+    jnz .user
+
+    ; Show OrangeFS v3 metadata.
+    cmp byte [ebx],'s'
+    jne .check_exec
+    cmp byte [ebx+1],'t'
+    jne .check_exec
+    cmp byte [ebx+2],'a'
+    jne .check_exec
+    cmp byte [ebx+3],'t'
+    jne .check_exec
+    cmp byte [ebx+4],' '
+    jne .check_exec
+    lea esi,[ebx+5]
+    call fs_stat32
+    test eax,eax
+    jz .file_not_found
+    call shell_print_line32
+    jmp .done
+.check_exec:
+    ; Load an OEX2 executable from OrangeFS into the PID 4 user slot.
+    cmp byte [ebx],'e'
+    jne .check_kill
+    cmp byte [ebx+1],'x'
+    jne .check_kill
+    cmp byte [ebx+2],'e'
+    jne .check_kill
+    cmp byte [ebx+3],'c'
+    jne .check_kill
+    cmp byte [ebx+4],' '
+    jne .check_kill
+    mov eax,3
+    call process_get_state32
+    cmp eax,1
+    je .exec_busy
+    cmp eax,2
+    je .exec_busy
+    lea esi,[ebx+5]
+    call fs_cat32
+    cmp eax,2
+    je .file_corrupt
+    test eax,eax
+    jz .file_not_found
+    call usermode_load_oex32
+    test eax,eax
+    jz .exec_error
+    call process_spawn_user32
+    call shell_print_line32
+    jmp .done
+.exec_busy:
+    mov esi,message_exec_busy
+    call shell_print_line32
+    jmp .done
+.exec_error:
+    call shell_print_line32
+    jmp .done
+
+.check_kill:
+    ; The first managed user process is PID 4.
+    cmp byte [ebx],'k'
+    jne .check_cat
+    cmp byte [ebx+1],'i'
+    jne .check_cat
+    cmp byte [ebx+2],'l'
+    jne .check_cat
+    cmp byte [ebx+3],'l'
+    jne .check_cat
+    cmp byte [ebx+4],' '
+    jne .check_cat
+    cmp byte [ebx+5],'4'
+    jne .kill_usage
+    cmp byte [ebx+6],0
+    jne .kill_usage
+    call process_kill_user32
+    call shell_print_line32
+    jmp .done
+.kill_usage:
+    mov esi,message_kill_usage
+    call shell_print_line32
+    jmp .done
+.check_cat:
     ; Commands beginning with "cat " pass the remaining text as a filename.
     cmp byte [ebx], 'c'
     jne .check_touch
@@ -159,8 +281,14 @@ shell_execute32:
     jne .check_touch
     lea esi, [ebx+4]
     call fs_cat32
+    cmp eax,2
+    je .file_corrupt
     test eax, eax
     jz .file_not_found
+    call shell_print_line32
+    jmp .done
+.file_corrupt:
+    mov esi,message_file_corrupt
     call shell_print_line32
     jmp .done
 
@@ -260,6 +388,8 @@ shell_execute32:
     call shell_print_line32
     mov esi, message_help_system
     call shell_print_line32
+    mov esi, message_help_test
+    call shell_print_line32
     jmp .done
 .info:
     mov esi, message_info
@@ -278,8 +408,24 @@ shell_execute32:
     call memory_get_info32
     call shell_print_line32
     jmp .done
+.memmap:
+    call memory_get_map32
+    call shell_print_line32
+    jmp .done
 .task:
     call process_get_info32
+    call shell_print_line32
+    jmp .done
+.ps:
+    call process_get_user_info32
+    call shell_print_line32
+    jmp .done
+.run_user:
+    call process_spawn_user32
+    call shell_print_line32
+    jmp .done
+.run_fault:
+    call process_spawn_fault32
     call shell_print_line32
     jmp .done
 .alloc:
@@ -299,6 +445,9 @@ shell_execute32:
     call shell_print_line32
     jmp .done
 .monitor:
+    call monitor_run32
+    jmp .done
+.status:
     call monitor_get_info32
     call shell_print_line32
     jmp .done
@@ -320,8 +469,16 @@ shell_execute32:
     call rtc_get_info32
     call shell_print_line32
     jmp .done
+.disk:
+    call fs_disk_info32
+    call shell_print_line32
+    jmp .done
 .selftest:
     call selftest_run32
+    call shell_print_line32
+    jmp .done
+.user:
+    call usermode_run32
     call shell_print_line32
     jmp .done
 .file_not_found:
@@ -394,27 +551,38 @@ command_info:     db 'info', 0
 command_clear:    db 'clear', 0
 command_ls:       db 'ls', 0
 command_mem:      db 'mem', 0
+command_memmap:   db 'memmap',0
 command_task:     db 'task', 0
+command_ps:       db 'ps',0
+command_run:      db 'run',0
+command_runfault: db 'runfault',0
 command_alloc:    db 'alloc', 0
 command_fault:    db 'fault', 0
 command_malloc:   db 'malloc', 0
 command_free:     db 'free', 0
 command_monitor:  db 'monitor', 0
+command_status:   db 'status',0
 command_dealloc:  db 'dealloc', 0
 command_reboot:   db 'reboot', 0
 command_shutdown: db 'shutdown', 0
 command_syscall:  db 'syscall',0
 command_date:     db 'date',0
+command_disk:     db 'disk',0
 command_selftest: db 'selftest',0
-message_help_core:   db 'Core: help info clear date monitor task syscall selftest',0
-message_help_memory: db 'Memory: mem alloc dealloc malloc free',0
-message_help_system: db 'Files: ls cat write touch rm | Power: reboot shutdown | Debug: fault',0
+command_user:     db 'user',0
+message_help_core:   db 'Core: help info clear date monitor status task ps run runfault kill',0
+message_help_memory: db 'Memory: mem memmap alloc dealloc malloc free',0
+message_help_system: db 'Files: ls cat stat write touch rm exec | Power: reboot shutdown | Debug: fault',0
+message_help_test:   db 'Tests: syscall selftest user | User fault: runfault',0
 message_info:     db 'OrangeOS 32-bit Protected Mode + Paging', 0
 message_unknown:  db 'Unknown command', 0
 message_file_not_found: db 'File not found', 0
+message_file_corrupt: db 'File data corrupt',0
 message_write_ok: db 'File updated', 0
 message_write_usage: db 'Usage: write <file> <text>', 0
 message_file_created: db 'File created',0
 message_file_exists: db 'File already exists',0
 message_create_failed: db 'Invalid name or directory full',0
 message_file_deleted: db 'File deleted',0
+message_kill_usage: db 'Usage: kill 4',0
+message_exec_busy: db 'PID4 is active; wait or kill it first',0

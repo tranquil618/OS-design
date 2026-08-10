@@ -4,13 +4,19 @@
 global isr_syscall32
 global syscall_get_info32
 
+extern usermode_return32
+
 extern timer_get_ticks32
 extern memory_get_free_pages32
 extern current_process
+extern process_exit_current32
+extern process_set_exit_code32
 
 SYS_GET_TICKS equ 0
 SYS_GET_FREE  equ 1
 SYS_GET_PID   equ 2
+SYS_EXIT      equ 3
+SYS_SET_RESULT equ 4
 
 ; EAX=call number. Return value in EAX; preserve all other registers.
 isr_syscall32:
@@ -26,6 +32,10 @@ isr_syscall32:
     je .free
     cmp eax,SYS_GET_PID
     je .pid
+    cmp eax,SYS_EXIT
+    je .exit
+    cmp eax,SYS_SET_RESULT
+    je .set_result
     mov eax,0xFFFFFFFF
     jmp .return
 .ticks:
@@ -37,6 +47,10 @@ isr_syscall32:
 .pid:
     mov eax,[current_process]
     inc eax
+    jmp .return
+.set_result:
+    call process_set_exit_code32
+    xor eax,eax
 .return:
     pop ebp
     pop edi
@@ -45,6 +59,26 @@ isr_syscall32:
     pop ecx
     pop ebx
     iretd
+.exit:
+    mov eax,[esp+28]
+    and eax,3
+    cmp eax,3
+    jne .invalid_exit
+    cmp dword [current_process],3
+    je .exit_process
+    ; Six saved registers precede the CPU's privilege-transition frame.
+    mov dword [esp+24],usermode_return32
+    mov dword [esp+28],0x08
+    xor eax,eax
+    jmp .return
+.exit_process:
+    call process_exit_current32
+    mov esp,eax
+    popad
+    iretd
+.invalid_exit:
+    mov eax,0xFFFFFFFF
+    jmp .return
 
 ; Exercise the ABI and return a printable summary in ESI.
 syscall_get_info32:

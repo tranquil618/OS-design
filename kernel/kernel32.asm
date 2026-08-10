@@ -11,6 +11,8 @@ extern memory_init32
 extern paging_init32
 extern fs_init32
 extern heap_init32
+extern gdt_init32
+extern usermode_init32
 
 ;CODE_SELECTOR equ 0x08
 DATA_SELECTOR equ 0x10
@@ -35,6 +37,9 @@ _start:
     ;字符串操作向高地址进行
     cld
 
+    ; Replace the loader GDT with the kernel GDT and load the Ring-0 TSS.
+    call gdt_init32
+
     ;清空VGA文本屏幕
     call clear_screen32
 
@@ -54,6 +59,8 @@ _start:
     call memory_init32
     ; Build identity page tables and enable CR0.PG.
     call paging_init32
+    ; Allocate and map isolated Ring-3 code, data and stack pages.
+    call usermode_init32
     ; Create the first-fit kernel heap.
     call heap_init32
     ; Load or create the persistent OrangeFS data sector.

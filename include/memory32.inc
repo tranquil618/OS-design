@@ -5,5 +5,8 @@ extern memory_alloc_page32
 extern memory_alloc_info32
 extern memory_get_limit32
 extern memory_get_free_pages32
+extern memory_get_total_pages32
+extern memory_get_used_pages32
+extern memory_get_map32
 extern memory_free_page32
 extern memory_free_info32

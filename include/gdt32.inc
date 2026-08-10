@@ -1,0 +1,2 @@
+extern gdt_init32
+extern gdt_is_ready32

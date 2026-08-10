@@ -10,7 +10,7 @@
 
 - Loader 改用 BIOS `INT 13h AH=42h` 扩展 LBA 读取。
 - Kernel 从 16 个扇区扩展到 32 个扇区。
-- Kernel 镜像上限从 8 KiB 提升至 16 KiB。
+- Kernel 镜像上限最初从 8 KiB 提升至 16 KiB，Day21 再扩展为 20 KiB。
 - Makefile 增加真实大小检查，超过限制时停止构建，避免静默截断。
 
 当前磁盘布局：
@@ -18,8 +18,8 @@
 ```text
 LBA 0       Boot Sector
 LBA 1       Loader
-LBA 2-33    Kernel（32 sectors / 16 KiB）
-LBA 34      OrangeFS 数据扇区
+LBA 2-41    Kernel（40 sectors / 20 KiB）
+LBA 42      OrangeFS 数据扇区
 其余空间    预留
 ```
 
@@ -62,7 +62,7 @@ LBA 34      OrangeFS 数据扇区
 - OrangeFS 升级为 `ORF2` 动态目录格式。
 - 支持最多 4 个文件、15 字符文件名和 63 字符内容。
 - 支持 `ls`、`cat`、`write`、`touch` 和 `rm`。
-- 文件内容写入 LBA 34，重新启动后仍然存在。
+- 文件内容写入 LBA 42，重新启动后仍然存在。
 
 ### 7. Shell 与终端
 

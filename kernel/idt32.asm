@@ -9,6 +9,7 @@ global idt_init32
 extern irq1_keyboard
 extern irq0_timer
 extern isr_syscall32
+extern process_fault_current32
 
 IRQ0_VECTOR equ 0x20
 IRQ1_VECTOR equ 0x21
@@ -111,6 +112,21 @@ isr_divide_error:
 isr_page_fault:
     cli
     pushad
+
+    ; A CPL3 exception frame contains error/EIP/CS/EFLAGS/user ESP/user SS.
+    mov eax,[esp+40]
+    and eax,3
+    cmp eax,3
+    jne .kernel_fault
+    mov eax,cr2
+    mov ebx,[esp+32]
+    mov ecx,[esp+36]
+    call process_fault_current32
+    mov esp,eax
+    popad
+    iretd
+
+.kernel_fault:
 
     mov esi,page_fault_message
     mov edi,0xB8000+320

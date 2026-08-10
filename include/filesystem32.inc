@@ -6,3 +6,6 @@ extern fs_init32
 extern fs_create32
 extern fs_delete32
 extern fs_is_ready32
+extern fs_stat32
+extern fs_verify_large32
+extern fs_disk_info32

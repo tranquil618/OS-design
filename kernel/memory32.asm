@@ -7,6 +7,9 @@ global memory_alloc_page32
 global memory_alloc_info32
 global memory_get_limit32
 global memory_get_free_pages32
+global memory_get_total_pages32
+global memory_get_used_pages32
+global memory_get_map32
 global memory_free_page32
 global memory_free_info32
 
@@ -145,6 +148,73 @@ memory_get_limit32:
 
 memory_get_free_pages32:
     mov eax,[free_pages]
+    ret
+
+memory_get_total_pages32:
+    mov eax,[page_limit]
+    sub eax,[managed_start]
+    shr eax,12
+    ret
+
+memory_get_used_pages32:
+    call memory_get_total_pages32
+    sub eax,[free_pages]
+    ret
+
+; Return a compact 20-cell physical page visualization in ESI.
+; '#' is allocated/managed by the kernel, '-' is currently free.
+memory_get_map32:
+    pushad
+    mov edi,memory_map_buffer
+    mov esi,memory_map_prefix
+    call append_string32
+
+    call memory_get_total_pages32
+    mov ebx,eax
+    mov esi,memory_used_prefix
+    call append_string32
+    ; append_string32 consumes AL while copying, so fetch the numeric value
+    ; only after the label has been appended.
+    call memory_get_used_pages32
+    call append_uint32
+    mov esi,memory_total_prefix
+    call append_string32
+    mov eax,ebx
+    call append_uint32
+    mov esi,memory_bar_prefix
+    call append_string32
+
+    ; Round used*20/total upward so small but real kernel usage is visible.
+    call memory_get_used_pages32
+    imul eax,eax,20
+    add eax,ebx
+    dec eax
+    xor edx,edx
+    test ebx,ebx
+    jz .empty_bar
+    div ebx
+    cmp eax,20
+    jbe .bar_count_ready
+    mov eax,20
+.bar_count_ready:
+    mov ecx,20
+.draw_bar:
+    test eax,eax
+    jz .draw_free
+    mov byte [edi],'#'
+    dec eax
+    jmp .next_cell
+.draw_free:
+    mov byte [edi],'-'
+.next_cell:
+    inc edi
+    loop .draw_bar
+.empty_bar:
+    mov byte [edi],']'
+    inc edi
+    mov byte [edi],0
+    popad
+    mov esi,memory_map_buffer
     ret
 
 ; Return ESI pointing to a summary built from BIOS boot information.
@@ -310,6 +380,10 @@ memory_base_prefix:   db 'Memory: base=', 0
 memory_usable_prefix: db ' KB usable=', 0
 memory_suffix:        db ' MB free=', 0
 memory_pages_suffix:  db ' pages', 0
+memory_map_prefix:    db 'Memory Map ',0
+memory_used_prefix:   db 'used=',0
+memory_total_prefix:  db '/',0
+memory_bar_prefix:    db ' pages [',0
 allocation_prefix:    db 'Allocated page: 0x', 0
 allocation_failed:    db 'Out of physical memory', 0
 free_page_ok:          db 'Last physical page released', 0
@@ -318,6 +392,7 @@ free_page_failed:      db 'Physical page release failed', 0
 hex_digits:           db '0123456789ABCDEF'
 memory_buffer:        times 64 db 0
 allocation_buffer:    times 40 db 0
+memory_map_buffer:    times 80 db 0
 
 align 4
 page_next:  dd 0

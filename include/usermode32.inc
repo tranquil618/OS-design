@@ -1,0 +1,8 @@
+extern usermode_init32
+extern usermode_run32
+extern usermode_return32
+extern usermode_is_ready32
+extern usermode_prepare32
+extern usermode_release32
+extern usermode_load_oex32
+extern usermode_get_entry32

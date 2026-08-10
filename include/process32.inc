@@ -3,3 +3,12 @@ extern process_init32
 extern process_get_info32
 extern scheduler_switch32
 extern process_get_switches32
+extern process_get_runtime32
+extern process_get_state32
+extern process_get_user_info32
+extern process_spawn_user32
+extern process_kill_user32
+extern process_exit_current32
+extern process_spawn_fault32
+extern process_fault_current32
+extern process_set_exit_code32

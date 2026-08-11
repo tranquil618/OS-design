@@ -1,7 +1,7 @@
 #=================================
 # OrangeOS Makefile
 #=================================
-.PHONY: all run test test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
+.PHONY: all run test test-autocomplete test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
 
 NASMFLAGS=-I include/ -f elf32
 
@@ -128,18 +128,20 @@ kernel/kernel.bin: $(KERNEL_OBJS)
 	$(KERNEL_OBJS) \
 	-o kernel/kernel.bin \
 	--oformat binary
-	test $$(stat -c%s kernel/kernel.bin) -le 20480
-	truncate -s 20480 kernel/kernel.bin
+	test $$(stat -c%s kernel/kernel.bin) -le 32768
+	truncate -s 32768 kernel/kernel.bin
 
 orange.img: \
 boot/boot.bin \
 loader/loader.bin \
-kernel/kernel.bin
+kernel/kernel.bin \
+assets/boot-video.bin
 	cat boot/boot.bin \
 	loader/loader.bin \
 	kernel/kernel.bin \
 	> orange.img
-	truncate -s 1048576 orange.img
+	truncate -s 4194304 orange.img
+	dd if=assets/boot-video.bin of=orange.img bs=512 seek=128 conv=notrunc status=none
 
 
 run: orange.img
@@ -149,7 +151,7 @@ run: orange.img
 test: orange.img
 	mkdir -p build
 	rm -f build/debugcon.log
-	timeout 3s $(QEMU) \
+	timeout 15s $(QEMU) \
 	-drive format=raw,file=orange.img \
 	-snapshot \
 	-display none \
@@ -163,10 +165,20 @@ test: orange.img
 	grep -q "OrangeOS> " build/debugcon.log
 	@echo "OrangeOS boot smoke test passed"
 
+test-autocomplete: orange.img
+	mkdir -p build
+	rm -f build/autocomplete.log
+	( sleep 12; echo 'sendkey h'; echo 'sendkey e'; echo 'sendkey l'; echo 'sendkey tab'; \
+	echo 'sendkey ret'; sleep 2; echo quit ) | $(QEMU) -drive format=raw,file=orange.img \
+	-snapshot -display none -serial none -no-reboot -debugcon file:build/autocomplete.log \
+	-global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
+	grep -q 'Core: help info clear' build/autocomplete.log
+	@echo "OrangeOS shell autocomplete test passed"
+
 test-ring3: orange.img
 	mkdir -p build
 	rm -f build/ring3.log
-	( sleep 1; \
+	( sleep 12; \
 	echo 'sendkey u'; echo 'sendkey s'; echo 'sendkey e'; echo 'sendkey r'; \
 	echo 'sendkey ret'; sleep 7; echo quit ) | \
 	$(QEMU) -drive format=raw,file=orange.img -snapshot -display none \
@@ -179,7 +191,7 @@ test-ring3: orange.img
 test-process: orange.img
 	mkdir -p build
 	rm -f build/process.log
-	( sleep 1; \
+	( sleep 12; \
 	echo 'sendkey r'; echo 'sendkey u'; echo 'sendkey n'; echo 'sendkey ret'; \
 	sleep 1; echo 'sendkey p'; echo 'sendkey s'; echo 'sendkey ret'; \
 	sleep 6; echo 'sendkey p'; echo 'sendkey s'; echo 'sendkey ret'; \
@@ -195,7 +207,7 @@ test-process: orange.img
 test-userfault: orange.img
 	mkdir -p build
 	rm -f build/userfault.log
-	( sleep 1; \
+	( sleep 12; \
 	echo 'sendkey r'; echo 'sendkey u'; echo 'sendkey n'; echo 'sendkey f'; \
 	echo 'sendkey a'; echo 'sendkey u'; echo 'sendkey l'; echo 'sendkey t'; \
 	echo 'sendkey ret'; sleep 2; \
@@ -214,7 +226,7 @@ test-userfault: orange.img
 test-resources: orange.img
 	mkdir -p build
 	rm -f build/resources.log
-	( sleep 1; \
+	( sleep 12; \
 	echo 'sendkey m'; echo 'sendkey e'; echo 'sendkey m'; echo 'sendkey m'; \
 	echo 'sendkey a'; echo 'sendkey p'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey r'; echo 'sendkey u'; echo 'sendkey n'; echo 'sendkey ret'; sleep 1; \
@@ -232,7 +244,7 @@ test-resources: orange.img
 test-exec: orange.img
 	mkdir -p build
 	rm -f build/exec.log
-	( sleep 1; echo 'sendkey l'; echo 'sendkey s'; echo 'sendkey ret'; sleep 1; \
+	( sleep 12; echo 'sendkey l'; echo 'sendkey s'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey e'; echo 'sendkey x'; echo 'sendkey e'; echo 'sendkey c'; \
 	echo 'sendkey spc'; echo 'sendkey d'; echo 'sendkey e'; echo 'sendkey m'; \
 	echo 'sendkey o'; echo 'sendkey dot'; echo 'sendkey o'; echo 'sendkey e'; \
@@ -254,7 +266,7 @@ test-exec: orange.img
 test-fs-large: orange.img
 	mkdir -p build
 	rm -f build/fs-large.log
-	( sleep 1; \
+	( sleep 12; \
 	echo 'sendkey s'; echo 'sendkey t'; echo 'sendkey a'; echo 'sendkey t'; \
 	echo 'sendkey spc'; echo 'sendkey b'; echo 'sendkey i'; echo 'sendkey g'; \
 	echo 'sendkey dot'; echo 'sendkey t'; echo 'sendkey x'; echo 'sendkey t'; \
@@ -265,14 +277,14 @@ test-fs-large: orange.img
 	$(QEMU) -drive format=raw,file=orange.img -snapshot -display none \
 	-serial none -no-reboot -debugcon file:build/fs-large.log \
 	-global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
-	grep -q "size=700 bytes start=48 sectors=2" build/fs-large.log
+	grep -q "size=700 bytes start=72 sectors=2" build/fs-large.log
 	grep -q "SELFTEST PASS:" build/fs-large.log
 	@echo "OrangeOS multi-sector filesystem test passed"
 
 test-fs-bitmap: orange.img
 	mkdir -p build
 	rm -f build/fs-bitmap.log
-	( sleep 1; echo 'sendkey d'; echo 'sendkey i'; echo 'sendkey s'; echo 'sendkey k'; echo 'sendkey ret'; sleep 1; \
+	( sleep 12; echo 'sendkey d'; echo 'sendkey i'; echo 'sendkey s'; echo 'sendkey k'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey t'; echo 'sendkey o'; echo 'sendkey u'; echo 'sendkey c'; echo 'sendkey h'; echo 'sendkey spc'; echo 'sendkey t'; echo 'sendkey m'; echo 'sendkey p'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey d'; echo 'sendkey i'; echo 'sendkey s'; echo 'sendkey k'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey w'; echo 'sendkey r'; echo 'sendkey i'; echo 'sendkey t'; echo 'sendkey e'; echo 'sendkey spc'; echo 'sendkey t'; echo 'sendkey m'; echo 'sendkey p'; echo 'sendkey spc'; echo 'sendkey h'; echo 'sendkey i'; echo 'sendkey ret'; sleep 1; \
@@ -289,7 +301,7 @@ test-fs-checksum: orange.img
 	mkdir -p build
 	rm -f build/fs-checksum.img build/fs-checksum.log
 	cp orange.img build/fs-checksum.img
-	( sleep 1; echo 'sendkey t'; echo 'sendkey o'; echo 'sendkey u'; echo 'sendkey c'; echo 'sendkey h'; \
+	( sleep 12; echo 'sendkey t'; echo 'sendkey o'; echo 'sendkey u'; echo 'sendkey c'; echo 'sendkey h'; \
 	echo 'sendkey spc'; echo 'sendkey k'; echo 'sendkey e'; echo 'sendkey e'; echo 'sendkey p'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey w'; echo 'sendkey r'; echo 'sendkey i'; echo 'sendkey t'; echo 'sendkey e'; echo 'sendkey spc'; \
 	echo 'sendkey k'; echo 'sendkey e'; echo 'sendkey e'; echo 'sendkey p'; echo 'sendkey spc'; \
@@ -297,8 +309,8 @@ test-fs-checksum: orange.img
 	echo 'sendkey e'; echo 'sendkey s'; echo 'sendkey ret'; sleep 2; echo quit ) | \
 	$(QEMU) -drive format=raw,file=build/fs-checksum.img -display none -serial none -no-reboot \
 	-debugcon file:build/fs-checksum-format.log -global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
-	printf '\377' | dd of=build/fs-checksum.img bs=1 seek=$$((42*512+4)) conv=notrunc status=none
-	( sleep 1; echo 'sendkey c'; echo 'sendkey a'; echo 'sendkey t'; echo 'sendkey spc'; \
+	printf '\377' | dd of=build/fs-checksum.img bs=1 seek=$$((66*512+4)) conv=notrunc status=none
+	( sleep 12; echo 'sendkey c'; echo 'sendkey a'; echo 'sendkey t'; echo 'sendkey spc'; \
 	echo 'sendkey k'; echo 'sendkey e'; echo 'sendkey e'; echo 'sendkey p'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey d'; echo 'sendkey i'; echo 'sendkey s'; echo 'sendkey k'; echo 'sendkey ret'; sleep 2; echo quit ) | \
 	$(QEMU) -drive format=raw,file=build/fs-checksum.img -snapshot -display none -serial none -no-reboot \
@@ -311,11 +323,11 @@ test-fs-data-checksum: orange.img
 	mkdir -p build
 	rm -f build/fs-data.img build/fs-data.log
 	cp orange.img build/fs-data.img
-	timeout 3s $(QEMU) -drive format=raw,file=build/fs-data.img -display none -monitor none \
+	timeout 15s $(QEMU) -drive format=raw,file=build/fs-data.img -display none -monitor none \
 	-serial none -no-reboot -debugcon file:build/fs-data-format.log \
 	-global isa-debugcon.iobase=0xe9 || [ $$? -eq 124 ]
-	printf 'X' | dd of=build/fs-data.img bs=1 seek=$$((43*512)) conv=notrunc status=none
-	( sleep 1; echo 'sendkey c'; echo 'sendkey a'; echo 'sendkey t'; echo 'sendkey spc'; \
+	printf 'X' | dd of=build/fs-data.img bs=1 seek=$$((67*512)) conv=notrunc status=none
+	( sleep 12; echo 'sendkey c'; echo 'sendkey a'; echo 'sendkey t'; echo 'sendkey spc'; \
 	echo 'sendkey h'; echo 'sendkey e'; echo 'sendkey l'; echo 'sendkey l'; echo 'sendkey o'; \
 	echo 'sendkey dot'; echo 'sendkey t'; echo 'sendkey x'; echo 'sendkey t'; echo 'sendkey ret'; \
 	sleep 2; echo quit ) | $(QEMU) -drive format=raw,file=build/fs-data.img -snapshot \
@@ -333,6 +345,7 @@ clean:
 	kernel/kernel.bin \
 	orange.img \
 	build/debugcon.log \
+	build/autocomplete.log \
 	build/ring3.log \
 	build/process.log \
 	build/userfault.log \

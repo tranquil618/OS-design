@@ -1,6 +1,7 @@
 # build files
 
 *.bin
+!assets/boot-video.bin
 *.o
 *.img
 build/

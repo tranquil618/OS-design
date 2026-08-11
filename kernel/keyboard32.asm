@@ -65,6 +65,8 @@ irq1_keyboard:
     ;处理Backspace
     cmp al,0x0E
     je .backspace
+    cmp al,0x0F
+    je .complete
     ;处理Enter
     cmp al,0x1C
     je .enter
@@ -123,6 +125,13 @@ irq1_keyboard:
     mov ebx,[input_length]
     call input_history_down32
 .history_redraw:
+    jmp .redraw_input
+.complete:
+    mov ebx,[input_length]
+    push ebx
+    call input_complete32
+    pop ebx
+.redraw_input:
     test edx,edx
     jz .send_eoi
     mov ecx,eax

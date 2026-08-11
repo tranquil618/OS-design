@@ -14,9 +14,9 @@ global fs_disk_info32
 
 %include "ata32.inc"
 
-DIR_LBA      equ 42
-BACKUP_LBA   equ 75
-DATA_LBA     equ 43
+DIR_LBA      equ 66
+BACKUP_LBA   equ 99
+DATA_LBA     equ 67
 FILE_COUNT   equ 7
 NAME_SIZE    equ 16
 ENTRY_SIZE   equ 24

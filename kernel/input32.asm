@@ -7,6 +7,7 @@ global input_submit32
 global input_poll32
 global input_history_up32
 global input_history_down32
+global input_complete32
 global input_buffer
 global input_length
 global command_ready
@@ -54,6 +55,58 @@ input_backspace32:
     mov eax,1
 .done:
     pop ecx
+    ret
+
+; Complete a unique command prefix. EDX=1 and EAX=new length when redrawing.
+input_complete32:
+    xor edx,edx
+    mov ecx,[input_length]
+    test ecx,ecx
+    jz .complete_done
+    mov esi,input_buffer
+    mov eax,ecx
+.reject_space:
+    cmp byte [esi],' '
+    je .complete_done
+    inc esi
+    dec eax
+    jnz .reject_space
+    mov esi,command_words
+    xor ebx,ebx
+    xor ebp,ebp
+.candidate:
+    cmp byte [esi],0
+    je .selection
+    mov edi,input_buffer
+    mov eax,ecx
+    push esi
+.prefix:
+    mov dl,[edi]
+    cmp dl,[esi]
+    jne .not_match
+    inc edi
+    inc esi
+    dec eax
+    jnz .prefix
+    inc ebx
+    mov ebp,[esp]
+.not_match:
+    pop esi
+.skip_word:
+    lodsb
+    test al,al
+    jnz .skip_word
+    jmp .candidate
+.selection:
+    xor edx,edx
+    cmp ebx,1
+    jne .complete_done
+    mov esi,ebp
+    mov edi,input_buffer
+    call copy_buffer32
+    call measure_input32
+    mov edx,1
+.complete_done:
     ret
 
 ; Mark the current input as ready for the kernel loop.
@@ -197,3 +250,9 @@ history_draft:   times BUFFER_SIZE db 0
 history_head:    dd 0
 history_count:   dd 0
 history_view:    dd -1
+
+command_words:
+    db 'help',0,'info',0,'clear',0,'ls',0,'mem',0,'memmap',0
+    db 'task',0,'ps',0,'run',0,'runfault',0,'alloc',0,'dealloc',0
+    db 'malloc',0,'free',0,'monitor',0,'status',0,'date',0,'disk',0
+    db 'selftest',0,'user',0,'reboot',0,'shutdown',0,'syscall',0,0

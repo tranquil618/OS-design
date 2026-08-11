@@ -36,7 +36,7 @@ test ebx,ebx
 jnz .e820_next
 .e820_done:
 
-; Load 40 sectors from LBA 2 to physical address 0x10000.
+; Load 64 sectors from LBA 2 to physical address 0x10000.
 xor ax,ax
 mov ds,ax
 mov si,kernel_dap
@@ -44,6 +44,8 @@ mov dl,0x80
 mov ah,0x42
 int 0x13
 jc disk_error
+
+call play_boot_video16
 
 call enable_a20
 
@@ -67,14 +69,56 @@ enable_a20:
     out 0x92,al
     ret
 
+play_boot_video16:
+    mov ax,0x0013
+    int 0x10
+    mov bp,40
+.frame:
+    xor ax,ax
+    mov ds,ax
+    mov si,video_dap
+    mov dl,0x80
+    mov ah,0x42
+    int 0x13
+    jc disk_error
+    mov ax,0x2000
+    mov ds,ax
+    xor si,si
+    mov ax,0xA000
+    mov es,ax
+    xor di,di
+    mov cx,32000
+    rep movsw
+    xor ax,ax
+    mov ds,ax
+    mov ah,0x86
+    mov cx,0x0001
+    mov dx,0x86A0
+    int 0x15
+    add dword [video_dap+8],125
+    adc dword [video_dap+12],0
+    dec bp
+    jnz .frame
+    xor ax,ax
+    mov ds,ax
+    mov ax,0x0003
+    int 0x10
+    ret
+
 align 4
 kernel_dap:
     db 0x10
     db 0
-    dw 40
+    dw 64
     dw 0x0000
     dw 0x1000
     dq 2
+
+video_dap:
+    db 0x10,0
+    dw 125
+    dw 0x0000,0x2000
+    dq 128
 
 gdt_start:
 gdt_null:

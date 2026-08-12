@@ -1,7 +1,7 @@
 #=================================
 # OrangeOS Makefile
 #=================================
-.PHONY: all run test test-autocomplete test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
+.PHONY: all run test test-autocomplete test-terminal test-ui test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
 
 NASMFLAGS=-I include/ -f elf32
 
@@ -24,6 +24,7 @@ kernel/paging32.o \
 kernel/usermode32.o \
 kernel/heap32.o \
 kernel/monitor32.o \
+kernel/ui32.o \
 kernel/power32.o \
 kernel/syscall32.o \
 kernel/rtc32.o \
@@ -77,7 +78,7 @@ kernel/pic32.o: kernel/pic32.asm
 kernel/timer32.o: kernel/timer32.asm
 	$(NASM) $(NASMFLAGS) kernel/timer32.asm -o kernel/timer32.o
 
-kernel/keyboard32.o: kernel/keyboard32.asm include/input32.inc include/monitor32.inc
+kernel/keyboard32.o: kernel/keyboard32.asm include/input32.inc include/monitor32.inc include/ui32.inc
 	$(NASM) $(NASMFLAGS) kernel/keyboard32.asm -o kernel/keyboard32.o
 	
 kernel/input32.o: kernel/input32.asm include/shell32.inc
@@ -97,6 +98,9 @@ kernel/heap32.o: kernel/heap32.asm include/memory32.inc
 
 kernel/monitor32.o: kernel/monitor32.asm include/memory32.inc include/process32.inc
 	$(NASM) $(NASMFLAGS) kernel/monitor32.asm -o kernel/monitor32.o
+
+kernel/ui32.o: kernel/ui32.asm
+	$(NASM) $(NASMFLAGS) kernel/ui32.asm -o kernel/ui32.o
 
 kernel/power32.o: kernel/power32.asm
 	$(NASM) $(NASMFLAGS) kernel/power32.asm -o kernel/power32.o
@@ -119,7 +123,7 @@ kernel/ata32.o: kernel/ata32.asm
 kernel/filesystem32.o: kernel/filesystem32.asm include/ata32.inc
 	$(NASM) $(NASMFLAGS) kernel/filesystem32.asm -o kernel/filesystem32.o
 
-kernel/shell32.o: kernel/shell32.asm include/keyboard32.inc include/filesystem32.inc include/memory32.inc include/process32.inc include/heap32.inc include/monitor32.inc include/power32.inc include/syscall32.inc include/rtc32.inc include/selftest32.inc include/usermode32.inc
+kernel/shell32.o: kernel/shell32.asm include/keyboard32.inc include/filesystem32.inc include/memory32.inc include/process32.inc include/heap32.inc include/monitor32.inc include/power32.inc include/syscall32.inc include/rtc32.inc include/selftest32.inc include/usermode32.inc include/ui32.inc
 	$(NASM) $(NASMFLAGS) kernel/shell32.asm -o kernel/shell32.o
 
 kernel/kernel.bin: $(KERNEL_OBJS)
@@ -174,6 +178,30 @@ test-autocomplete: orange.img
 	-global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
 	grep -q 'Core: help info clear' build/autocomplete.log
 	@echo "OrangeOS shell autocomplete test passed"
+
+test-terminal: orange.img
+	mkdir -p build
+	rm -f build/terminal.log build/wrap.ppm build/scrollback.ppm
+	sh tools/capture_terminal.sh
+	grep -q 'Unknown command' build/terminal.log
+	grep -q 'Core: help info clear' build/terminal.log
+	test -s build/wrap.ppm
+	test -s build/scrollback.ppm
+	@echo "OrangeOS terminal cursor, wrapping and scrollback test passed"
+
+test-ui: orange.img
+	mkdir -p build
+	rm -f build/ui.log
+	( sleep 12; echo 'sendkey g'; echo 'sendkey u'; echo 'sendkey i'; echo 'sendkey ret'; \
+	sleep 1; echo 'sendkey ret'; sleep 1; echo 'sendkey q'; sleep 1; \
+	echo 'sendkey down'; echo 'sendkey down'; echo 'sendkey ret'; sleep 2; \
+	echo 'sendkey right'; echo 'sendkey left'; echo 'sendkey q'; sleep 1; echo 'sendkey q'; \
+	sleep 1; echo quit ) | $(QEMU) -drive format=raw,file=orange.img \
+	-snapshot -display none -serial none -no-reboot -debugcon file:build/ui.log \
+	-global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
+	grep -q 'GUI READY' build/ui.log
+	grep -q 'GAME ACTIVE' build/ui.log
+	@echo "OrangeOS desktop and mini-game test passed"
 
 test-ring3: orange.img
 	mkdir -p build
@@ -346,6 +374,10 @@ clean:
 	orange.img \
 	build/debugcon.log \
 	build/autocomplete.log \
+	build/terminal.log \
+	build/wrap.ppm \
+	build/scrollback.ppm \
+	build/ui.log \
 	build/ring3.log \
 	build/process.log \
 	build/userfault.log \

@@ -15,6 +15,7 @@ global shell_execute32
 %include "rtc32.inc"
 %include "selftest32.inc"
 %include "usermode32.inc"
+%include "ui32.inc"
 
 extern print_string32
 extern clear_screen32
@@ -64,6 +65,17 @@ shell_execute32:
     call string_equal32
     test eax, eax
     jnz .clear
+
+    mov esi,ebx
+    mov edi,command_gui
+    call string_equal32
+    test eax,eax
+    jnz .gui
+    mov esi,ebx
+    mov edi,command_game
+    call string_equal32
+    test eax,eax
+    jnz .game
 
     mov esi, ebx
     mov edi, command_ls
@@ -400,6 +412,16 @@ shell_execute32:
     xor eax, eax
     call keyboard_set_cursor32
     jmp .done
+.gui:
+    mov esi,message_gui_ready
+    call shell_print_line32
+    call ui_run32
+    jmp .done
+.game:
+    mov esi,message_game_ready
+    call shell_print_line32
+    call game_run32
+    jmp .done
 .ls:
     call fs_list32
     call shell_print_line32
@@ -569,10 +591,12 @@ command_syscall:  db 'syscall',0
 command_date:     db 'date',0
 command_disk:     db 'disk',0
 command_selftest: db 'selftest',0
+command_gui: db 'gui',0
+command_game: db 'game',0
 command_user:     db 'user',0
 message_help_core:   db 'Core: help info clear date monitor status task ps run runfault kill',0
 message_help_memory: db 'Memory: mem memmap alloc dealloc malloc free',0
-message_help_system: db 'Files: ls cat stat write touch rm exec | Power: reboot shutdown | Debug: fault',0
+message_help_system: db 'Files: ls cat stat write touch rm exec | Apps: gui game | Power: reboot shutdown',0
 message_help_test:   db 'Tests: syscall selftest user | User fault: runfault',0
 message_info:     db 'OrangeOS 32-bit Protected Mode + Paging', 0
 message_unknown:  db 'Unknown command', 0
@@ -586,3 +610,5 @@ message_create_failed: db 'Invalid name or directory full',0
 message_file_deleted: db 'File deleted',0
 message_kill_usage: db 'Usage: kill 4',0
 message_exec_busy: db 'PID4 is active; wait or kill it first',0
+message_gui_ready: db 'GUI READY',0
+message_game_ready: db 'GAME READY',0

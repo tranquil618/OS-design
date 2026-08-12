@@ -8,8 +8,11 @@ global keyboard_get_cursor32
 global keyboard_set_cursor32
 
 extern monitor_keyboard32
+extern ui_keyboard32
 
 extern scroll_input32
+extern screen_scrollback_up32
+extern screen_scrollback_down32
 
 %include "input32.inc"
 
@@ -34,6 +37,10 @@ irq1_keyboard:
     test eax,eax
     jnz .send_eoi
     mov al,bl
+    call ui_keyboard32
+    test eax,eax
+    jnz .send_eoi
+    mov al,bl
     ;处理左Shift释放
     cmp al,0xE0
     je .extended_prefix
@@ -44,6 +51,10 @@ irq1_keyboard:
     je .history_up
     cmp al,0x50
     je .history_down
+    cmp al,0x49
+    je .scrollback_up
+    cmp al,0x51
+    je .scrollback_down
     jmp .send_eoi
 .normal_scan:
     cmp al,0xAA
@@ -107,10 +118,12 @@ irq1_keyboard:
     ;到达行尾后回到第三行开头
     cmp edi,INPUT_AREA_SIZE
     jb .save_cursor
-    xor edi,edi
+    call scroll_input32
+    mov edi,INPUT_AREA_SIZE-160
 
 .save_cursor:
     mov [keyboard_cursor],edi
+    call keyboard_update_hw_cursor32
     jmp .send_eoi
 
 .extended_prefix:
@@ -124,6 +137,13 @@ irq1_keyboard:
 .history_down:
     mov ebx,[input_length]
     call input_history_down32
+    jmp .history_redraw
+.scrollback_up:
+    call screen_scrollback_up32
+    jmp .send_eoi
+.scrollback_down:
+    call screen_scrollback_down32
+    jmp .send_eoi
 .history_redraw:
     jmp .redraw_input
 .complete:
@@ -266,6 +286,32 @@ keyboard_set_cursor32:
 
 .save:
     mov [keyboard_cursor],eax
+    call keyboard_update_hw_cursor32
+    ret
+
+keyboard_update_hw_cursor32:
+    push eax
+    push ebx
+    push edx
+    mov eax,[keyboard_cursor]
+    add eax,INPUT_START
+    shr eax,1
+    mov ebx,eax
+    mov dx,0x3D4
+    mov al,0x0F
+    out dx,al
+    inc dx
+    mov al,bl
+    out dx,al
+    dec dx
+    mov al,0x0E
+    out dx,al
+    inc dx
+    mov al,bh
+    out dx,al
+    pop edx
+    pop ebx
+    pop eax
     ret
 
 keyboard_cursor:

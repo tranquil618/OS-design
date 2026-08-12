@@ -14,7 +14,7 @@ global command_ready
 
 %include "shell32.inc"
 
-BUFFER_SIZE   equ 64
+BUFFER_SIZE   equ 128
 HISTORY_SIZE  equ 8
 
 ; AL=ASCII. Return EAX=1 when appended.
@@ -164,7 +164,7 @@ history_load_view32:
     dec eax
     sub eax,[history_view]
     and eax,HISTORY_SIZE-1
-    shl eax,6
+    shl eax,7
     lea esi,[history_entries+eax]
     mov edi,input_buffer
     call copy_buffer32
@@ -200,7 +200,7 @@ input_poll32:
 
 history_store32:
     mov eax,[history_head]
-    shl eax,6
+    shl eax,7
     lea edi,[history_entries+eax]
     mov esi,input_buffer
     call copy_buffer32
@@ -255,4 +255,4 @@ command_words:
     db 'help',0,'info',0,'clear',0,'ls',0,'mem',0,'memmap',0
     db 'task',0,'ps',0,'run',0,'runfault',0,'alloc',0,'dealloc',0
     db 'malloc',0,'free',0,'monitor',0,'status',0,'date',0,'disk',0
-    db 'selftest',0,'user',0,'reboot',0,'shutdown',0,'syscall',0,0
+    db 'selftest',0,'user',0,'gui',0,'game',0,'reboot',0,'shutdown',0,'syscall',0,0

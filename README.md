@@ -595,6 +595,15 @@ OrangeFS 用户程序采用 `OEX2:EE:LL:CC:<hex machine code>` 格式，其中�
 
     make test-exec
 
+系统调用 `SYS_WRITE`（EAX=5）允许 Ring 3 程序以 `ESI=用户地址`、`ECX=长度`
+请求内核输出文本。内核验证调用者特权级、长度和地址范围，只接受当前映射的用户代码、
+数据或栈页，并先复制到最长 127 字节的内核缓冲区。默认 `demo.oex` 会输出：
+
+    Hello from Ring3 OEX!
+
+随后设置退出码 42 并通过 `SYS_EXIT` 结束。这证明磁盘中的用户程序不能直接操作 VGA，
+而是通过受控 ABI 使用内核服务。
+
 损坏格式验证：
 
     exec bad.oex
@@ -759,9 +768,28 @@ Shell 终端新增：
 GUI 桌面现在支持上下方向键选择和 Enter 打开：SYSTEM 启动 Monitor，FILES 显示
 OrangeFS 文件列表，APPS 启动 ORANGE CATCH。全屏应用返回后会重新恢复桌面焦点。
 
+FILES 已升级为交互式文件管理器：上下键选择文件，Enter 打开内置文本编辑器；编辑器
+支持普通字符、Shift、退格和回车，按 `F2` 将内容写回 OrangeFS，按 `Esc` 返回文件列表。
+保存后的内容可由 Shell 的 `cat` 读取，并在非快照运行中跨重启保留。
+
 自动验证：
 
     make test-terminal
     make test-ui
+    make test-ui-files
+
+------------------------------------------------------------------------
+
+# 22. 最终发布与答辩准备
+
+完整发布回归统一使用：
+
+    make test-release
+
+该目标顺序执行全部 14 项 QEMU 自动测试，只有最后出现
+`OrangeOS release regression PASSED (14/14)` 才视为候选发布版。
+
+答辩前的人工验收步骤见 `docs/RELEASE_CHECKLIST.md`，按模块阅读源码的七天路线见
+`docs/CODE_READING.md`。
 
 成为一个具有完整结构和展示价值的小型操作系统。

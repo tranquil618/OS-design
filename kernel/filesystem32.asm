@@ -11,6 +11,7 @@ global fs_is_ready32
 global fs_stat32
 global fs_verify_large32
 global fs_disk_info32
+global fs_get_name32
 
 %include "ata32.inc"
 
@@ -253,6 +254,34 @@ fs_list32:
     mov byte [edi],0
     popad
     mov esi,list_buffer
+    ret
+
+; EAX=visible file index. Return EAX=1/ESI=name, or EAX=0.
+fs_get_name32:
+    push ebx
+    push ecx
+    push edi
+    mov ebx,eax
+    mov edi,fs_directory+ENTRY_BASE
+    mov ecx,FILE_COUNT
+.scan:
+    cmp byte [edi],0
+    je .next
+    test ebx,ebx
+    jz .found
+    dec ebx
+.next:
+    add edi,ENTRY_SIZE
+    loop .scan
+    xor eax,eax
+    jmp .done
+.found:
+    mov esi,edi
+    mov eax,1
+.done:
+    pop edi
+    pop ecx
+    pop ebx
     ret
 
 ; ESI=name -> EAX=1, ESI=content.
@@ -741,7 +770,7 @@ default_about: db 'OrangeFS v8',0
 default_about_end:
 default_config: db 'fs=ORF8 paging=on',0
 default_config_end:
-default_demo: db 'OEX2:00:13:F6:BB2A000000B804000000CD80B803000000CD80',0
+default_demo: db 'OEX2:00:39:C8:BE24000040B915000000B805000000CD80BB2A000000B804000000CD80B803000000CD8048656C6C6F2066726F6D2052696E6733204F455821',0
 default_demo_end:
 default_bad: db 'OEX2:00:01:00:90',0
 default_bad_end:

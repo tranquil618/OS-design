@@ -3,6 +3,7 @@
 
 global shell_prompt32
 global shell_execute32
+global shell_print_line32
 
 %include "keyboard32.inc"
 %include "filesystem32.inc"

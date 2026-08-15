@@ -1,7 +1,7 @@
 #=================================
 # OrangeOS Makefile
 #=================================
-.PHONY: all run test test-autocomplete test-terminal test-ui test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
+.PHONY: all run test test-release test-autocomplete test-terminal test-ui test-ui-files test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
 
 NASMFLAGS=-I include/ -f elf32
 
@@ -169,6 +169,26 @@ test: orange.img
 	grep -q "OrangeOS> " build/debugcon.log
 	@echo "OrangeOS boot smoke test passed"
 
+# Final release gate. Keep the sub-makes sequential because several QEMU tests
+# create temporary disk images and consume monitor input on the same host.
+test-release: orange.img
+	@echo "== OrangeOS release regression =="
+	$(MAKE) test
+	$(MAKE) test-autocomplete
+	$(MAKE) test-terminal
+	$(MAKE) test-ui
+	$(MAKE) test-ui-files
+	$(MAKE) test-ring3
+	$(MAKE) test-process
+	$(MAKE) test-userfault
+	$(MAKE) test-resources
+	$(MAKE) test-exec
+	$(MAKE) test-fs-large
+	$(MAKE) test-fs-bitmap
+	$(MAKE) test-fs-checksum
+	$(MAKE) test-fs-data-checksum
+	@echo "== OrangeOS release regression PASSED (14/14) =="
+
 test-autocomplete: orange.img
 	mkdir -p build
 	rm -f build/autocomplete.log
@@ -202,6 +222,27 @@ test-ui: orange.img
 	grep -q 'GUI READY' build/ui.log
 	grep -q 'GAME ACTIVE' build/ui.log
 	@echo "OrangeOS desktop and mini-game test passed"
+
+test-ui-files: orange.img
+	mkdir -p build
+	rm -f build/ui-files.log
+	( sleep 12; echo 'sendkey g'; echo 'sendkey u'; echo 'sendkey i'; echo 'sendkey ret'; \
+	sleep 1; echo 'sendkey down'; echo 'sendkey ret'; sleep 1; \
+	echo 'sendkey down'; sleep 1; echo 'sendkey up'; sleep 1; echo 'sendkey ret'; \
+	sleep 1; echo 'sendkey x'; echo 'sendkey f2'; sleep 2; echo 'sendkey esc'; \
+	echo 'sendkey q'; echo 'sendkey q'; sleep 1; echo 'sendkey c'; echo 'sendkey a'; \
+	echo 'sendkey t'; echo 'sendkey spc'; echo 'sendkey h'; echo 'sendkey e'; \
+	echo 'sendkey l'; echo 'sendkey l'; echo 'sendkey o'; echo 'sendkey dot'; \
+	echo 'sendkey t'; echo 'sendkey x'; echo 'sendkey t'; echo 'sendkey ret'; \
+	sleep 1; echo quit ) | $(QEMU) \
+	-drive format=raw,file=orange.img -snapshot -display none -serial none -no-reboot \
+	-debugcon file:build/ui-files.log -global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
+	grep -q 'FILE MANAGER READY' build/ui-files.log
+	test $$(grep -o 'FILE MANAGER READY' build/ui-files.log | wc -l) -ge 3
+	grep -q 'EDITOR READY' build/ui-files.log
+	grep -q 'FILE SAVED' build/ui-files.log
+	grep -q 'Hello from OrangeFS v8!x' build/ui-files.log
+	@echo "OrangeOS GUI file editor test passed"
 
 test-ring3: orange.img
 	mkdir -p build
@@ -286,6 +327,7 @@ test-exec: orange.img
 	-serial none -no-reboot -debugcon file:build/exec.log \
 	-global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
 	grep -q "demo.oex" build/exec.log
+	grep -q "Hello from Ring3 OEX!" build/exec.log
 	grep -q "PID4 user state=EXITED" build/exec.log
 	grep -q "code=42" build/exec.log
 	grep -q "Invalid OEX2 executable" build/exec.log
@@ -378,6 +420,7 @@ clean:
 	build/wrap.ppm \
 	build/scrollback.ppm \
 	build/ui.log \
+	build/ui-files.log \
 	build/ring3.log \
 	build/process.log \
 	build/userfault.log \

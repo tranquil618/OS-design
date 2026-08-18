@@ -1,7 +1,7 @@
 #=================================
 # OrangeOS Makefile
 #=================================
-.PHONY: all run test test-release test-autocomplete test-terminal test-ui test-ui-files test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
+.PHONY: all run test test-release test-autocomplete test-terminal test-ui test-ui-files test-ui-crud test-tetris test-ring3 test-process test-userfault test-resources test-exec test-fs-large test-fs-bitmap test-fs-checksum test-fs-data-checksum clean
 
 NASMFLAGS=-I include/ -f elf32
 
@@ -25,6 +25,7 @@ kernel/usermode32.o \
 kernel/heap32.o \
 kernel/monitor32.o \
 kernel/ui32.o \
+kernel/tetris32.o \
 kernel/power32.o \
 kernel/syscall32.o \
 kernel/rtc32.o \
@@ -102,6 +103,9 @@ kernel/monitor32.o: kernel/monitor32.asm include/memory32.inc include/process32.
 kernel/ui32.o: kernel/ui32.asm
 	$(NASM) $(NASMFLAGS) kernel/ui32.asm -o kernel/ui32.o
 
+kernel/tetris32.o: kernel/tetris32.asm
+	$(NASM) $(NASMFLAGS) kernel/tetris32.asm -o kernel/tetris32.o
+
 kernel/power32.o: kernel/power32.asm
 	$(NASM) $(NASMFLAGS) kernel/power32.asm -o kernel/power32.o
 
@@ -132,8 +136,8 @@ kernel/kernel.bin: $(KERNEL_OBJS)
 	$(KERNEL_OBJS) \
 	-o kernel/kernel.bin \
 	--oformat binary
-	test $$(stat -c%s kernel/kernel.bin) -le 32768
-	truncate -s 32768 kernel/kernel.bin
+	test $$(stat -c%s kernel/kernel.bin) -le 40960
+	truncate -s 40960 kernel/kernel.bin
 
 orange.img: \
 boot/boot.bin \
@@ -178,6 +182,8 @@ test-release: orange.img
 	$(MAKE) test-terminal
 	$(MAKE) test-ui
 	$(MAKE) test-ui-files
+	$(MAKE) test-ui-crud
+	$(MAKE) test-tetris
 	$(MAKE) test-ring3
 	$(MAKE) test-process
 	$(MAKE) test-userfault
@@ -187,7 +193,7 @@ test-release: orange.img
 	$(MAKE) test-fs-bitmap
 	$(MAKE) test-fs-checksum
 	$(MAKE) test-fs-data-checksum
-	@echo "== OrangeOS release regression PASSED (14/14) =="
+	@echo "== OrangeOS release regression PASSED (16/16) =="
 
 test-autocomplete: orange.img
 	mkdir -p build
@@ -243,6 +249,39 @@ test-ui-files: orange.img
 	grep -q 'FILE SAVED' build/ui-files.log
 	grep -q 'Hello from OrangeFS v8!x' build/ui-files.log
 	@echo "OrangeOS GUI file editor test passed"
+
+test-ui-crud: orange.img
+	mkdir -p build
+	rm -f build/ui-crud.log
+	( sleep 12; echo 'sendkey g'; echo 'sendkey u'; echo 'sendkey i'; echo 'sendkey ret'; \
+	sleep 1; echo 'sendkey down'; echo 'sendkey ret'; sleep 1; echo 'sendkey n'; \
+	echo 'sendkey n'; echo 'sendkey e'; echo 'sendkey w'; echo 'sendkey dot'; \
+	echo 'sendkey t'; echo 'sendkey x'; echo 'sendkey t'; echo 'sendkey ret'; sleep 1; \
+	echo 'sendkey h'; echo 'sendkey i'; echo 'sendkey f2'; sleep 1; echo 'sendkey esc'; \
+	echo 'sendkey down'; echo 'sendkey down'; echo 'sendkey down'; echo 'sendkey down'; \
+	echo 'sendkey down'; echo 'sendkey down'; echo 'sendkey delete'; sleep 1; \
+	echo 'sendkey ret'; sleep 2; echo 'sendkey q'; echo 'sendkey q'; sleep 1; \
+	echo 'sendkey l'; echo 'sendkey s'; echo 'sendkey ret'; sleep 1; echo quit ) | $(QEMU) \
+	-drive format=raw,file=orange.img -snapshot -display none -serial none -no-reboot \
+	-debugcon file:build/ui-crud.log -global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
+	grep -q 'FILE CREATED' build/ui-crud.log
+	grep -q 'FILE SAVED' build/ui-crud.log
+	grep -q 'FILE DELETED' build/ui-crud.log
+	! grep -q 'new.txt' build/ui-crud.log
+	@echo "OrangeOS GUI file create/edit/delete test passed"
+
+test-tetris: orange.img
+	mkdir -p build
+	rm -f build/tetris.log
+	( sleep 12; echo 'sendkey t'; echo 'sendkey e'; echo 'sendkey t'; echo 'sendkey r'; \
+	echo 'sendkey i'; echo 'sendkey s'; echo 'sendkey ret'; sleep 2; \
+	echo 'sendkey left'; echo 'sendkey right'; echo 'sendkey up'; echo 'sendkey down'; \
+	echo 'sendkey spc'; sleep 2; echo 'sendkey q'; sleep 1; echo quit ) | $(QEMU) \
+	-drive format=raw,file=orange.img -snapshot -display none -serial none -no-reboot \
+	-debugcon file:build/tetris.log -global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
+	grep -q 'TETRIS READY' build/tetris.log
+	grep -q 'OrangeOS> ' build/tetris.log
+	@echo "OrangeOS Tetris keyboard and return-to-shell test passed"
 
 test-ring3: orange.img
 	mkdir -p build
@@ -347,7 +386,7 @@ test-fs-large: orange.img
 	$(QEMU) -drive format=raw,file=orange.img -snapshot -display none \
 	-serial none -no-reboot -debugcon file:build/fs-large.log \
 	-global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
-	grep -q "size=700 bytes start=72 sectors=2" build/fs-large.log
+	grep -q "size=700 bytes start=88 sectors=2" build/fs-large.log
 	grep -q "SELFTEST PASS:" build/fs-large.log
 	@echo "OrangeOS multi-sector filesystem test passed"
 
@@ -379,7 +418,7 @@ test-fs-checksum: orange.img
 	echo 'sendkey e'; echo 'sendkey s'; echo 'sendkey ret'; sleep 2; echo quit ) | \
 	$(QEMU) -drive format=raw,file=build/fs-checksum.img -display none -serial none -no-reboot \
 	-debugcon file:build/fs-checksum-format.log -global isa-debugcon.iobase=0xe9 -monitor stdio >/dev/null
-	printf '\377' | dd of=build/fs-checksum.img bs=1 seek=$$((66*512+4)) conv=notrunc status=none
+	printf '\377' | dd of=build/fs-checksum.img bs=1 seek=$$((82*512+4)) conv=notrunc status=none
 	( sleep 12; echo 'sendkey c'; echo 'sendkey a'; echo 'sendkey t'; echo 'sendkey spc'; \
 	echo 'sendkey k'; echo 'sendkey e'; echo 'sendkey e'; echo 'sendkey p'; echo 'sendkey ret'; sleep 1; \
 	echo 'sendkey d'; echo 'sendkey i'; echo 'sendkey s'; echo 'sendkey k'; echo 'sendkey ret'; sleep 2; echo quit ) | \
@@ -396,7 +435,7 @@ test-fs-data-checksum: orange.img
 	timeout 15s $(QEMU) -drive format=raw,file=build/fs-data.img -display none -monitor none \
 	-serial none -no-reboot -debugcon file:build/fs-data-format.log \
 	-global isa-debugcon.iobase=0xe9 || [ $$? -eq 124 ]
-	printf 'X' | dd of=build/fs-data.img bs=1 seek=$$((67*512)) conv=notrunc status=none
+	printf 'X' | dd of=build/fs-data.img bs=1 seek=$$((83*512)) conv=notrunc status=none
 	( sleep 12; echo 'sendkey c'; echo 'sendkey a'; echo 'sendkey t'; echo 'sendkey spc'; \
 	echo 'sendkey h'; echo 'sendkey e'; echo 'sendkey l'; echo 'sendkey l'; echo 'sendkey o'; \
 	echo 'sendkey dot'; echo 'sendkey t'; echo 'sendkey x'; echo 'sendkey t'; echo 'sendkey ret'; \
@@ -421,6 +460,8 @@ clean:
 	build/scrollback.ppm \
 	build/ui.log \
 	build/ui-files.log \
+	build/ui-crud.log \
+	build/tetris.log \
 	build/ring3.log \
 	build/process.log \
 	build/userfault.log \

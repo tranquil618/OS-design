@@ -36,7 +36,7 @@ test ebx,ebx
 jnz .e820_next
 .e820_done:
 
-; Load 64 sectors from LBA 2 to physical address 0x10000.
+; Load 80 sectors from LBA 2 to physical address 0x10000.
 xor ax,ax
 mov ds,ax
 mov si,kernel_dap
@@ -109,7 +109,7 @@ align 4
 kernel_dap:
     db 0x10
     db 0
-    dw 64
+    dw 80
     dw 0x0000
     dw 0x1000
     dq 2

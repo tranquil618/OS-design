@@ -13,10 +13,10 @@ make test-release
 最后必须显示：
 
 ```text
-== OrangeOS release regression PASSED (14/14) ==
+== OrangeOS release regression PASSED (16/16) ==
 ```
 
-覆盖范围：启动与 Shell、Tab 补全、终端光标/换行/回看、GUI/游戏/文件编辑器、Ring 3、用户进程生命周期、用户态异常隔离、页面回收、OEX2 加载，以及 OrangeFS 跨扇区、位图、双目录恢复和数据校验。
+覆盖范围：启动与 Shell、Tab 补全、终端光标/换行/回看、GUI/文件 CRUD/两个游戏、Ring 3、用户进程生命周期、用户态异常隔离、页面回收、OEX2 加载，以及 OrangeFS 跨扇区、位图、双目录恢复和数据校验。
 
 ## 二、五分钟人工演示
 
@@ -42,7 +42,9 @@ gui
 - OEX2 程序退出码为 42；
 - OEX2 程序通过 `SYS_WRITE` 输出 `Hello from Ring3 OEX!`；
 - GUI 可用上下键选择、Enter 打开、Q/Esc 返回；
+- 文件管理器可用 `N` 新建、Enter 编辑、`F2` 保存、`Delete` 确认删除；
 - 在 APPS 中进入游戏，左右键可移动角色；
+- Shell 输入 `tetris`，验证移动、旋转、软降、硬降和返回；
 - 长输入会跨行，`PageUp`/`PageDown` 可以查看历史输出。
 
 ## 三、异常与持久化演示（可选）

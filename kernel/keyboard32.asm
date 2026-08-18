@@ -9,6 +9,7 @@ global keyboard_set_cursor32
 
 extern monitor_keyboard32
 extern ui_keyboard32
+extern tetris_keyboard32
 
 extern scroll_input32
 extern screen_scrollback_up32
@@ -33,6 +34,10 @@ irq1_keyboard:
     ;读取键盘扫描码
     in al,KEYBOARD_DATA
     mov bl,al
+    call tetris_keyboard32
+    test eax,eax
+    jnz .send_eoi
+    mov al,bl
     call monitor_keyboard32
     test eax,eax
     jnz .send_eoi

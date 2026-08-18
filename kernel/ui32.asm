@@ -14,6 +14,8 @@ extern fs_list32
 extern fs_get_name32
 extern fs_cat32
 extern fs_write32
+extern fs_create32
+extern fs_delete32
 
 VGA equ 0xB8000
 CELLS equ 80*25
@@ -47,6 +49,12 @@ ui_run32:
     je .file_open
     cmp al,5
     je .file_save
+    cmp al,6
+    je .file_create
+    cmp al,7
+    je .delete_prepare
+    cmp al,8
+    je .file_delete
     call game_run32
     mov byte [ui_mode],1
     call desktop_draw32
@@ -61,6 +69,7 @@ ui_run32:
 .open_files:
     mov byte [ui_mode],3
     mov byte [file_selected],0
+    mov byte [file_status],0
     call file_browser_draw32
     sti
     jmp .sleep
@@ -76,6 +85,55 @@ ui_run32:
     call editor_draw32
     mov esi,save_debug
     call ui_debug32
+    sti
+    jmp .sleep
+.file_create:
+    mov esi,filename_buffer
+    call fs_create32
+    cmp eax,1
+    je .created
+    cmp eax,2
+    je .create_exists
+    mov byte [file_status],3
+    mov byte [ui_mode],3
+    call file_browser_draw32
+    jmp .action_done
+.create_exists:
+    mov byte [file_status],2
+    mov byte [ui_mode],3
+    call file_browser_draw32
+    jmp .action_done
+.created:
+    call editor_new32
+    mov esi,create_debug
+    call ui_debug32
+    jmp .action_done
+.delete_prepare:
+    call delete_prepare32
+    jmp .action_done
+.file_delete:
+    mov esi,delete_name
+    call fs_delete32
+    test eax,eax
+    jz .delete_failed
+    mov byte [file_status],1
+    mov esi,delete_debug
+    call ui_debug32
+    jmp .delete_adjust
+.delete_failed:
+    mov byte [file_status],4
+.delete_adjust:
+    movzx eax,byte [file_selected]
+    call fs_get_name32
+    test eax,eax
+    jnz .delete_draw
+    cmp byte [file_selected],0
+    je .delete_draw
+    dec byte [file_selected]
+.delete_draw:
+    mov byte [ui_mode],3
+    call file_browser_draw32
+.action_done:
     sti
 .sleep:
     hlt
@@ -133,6 +191,10 @@ ui_keyboard32:
     je .file_keys
     cmp byte [ui_mode],4
     je .editor_keys
+    cmp byte [ui_mode],5
+    je .filename_keys
+    cmp byte [ui_mode],6
+    je .delete_keys
     cmp al,0x01
     je .exit
     cmp al,0x10
@@ -182,6 +244,10 @@ ui_keyboard32:
     je .file_down
     cmp al,0x1C
     je .file_open_key
+    cmp al,0x31
+    je .file_new_key
+    cmp al,0x53
+    je .file_delete_key
     jmp .used
 .file_up:
     cmp byte [file_selected],0
@@ -202,6 +268,15 @@ ui_keyboard32:
     jmp .used
 .file_open_key:
     mov byte [ui_action],4
+    jmp .used
+.file_new_key:
+    mov dword [filename_length],0
+    mov byte [filename_buffer],0
+    mov byte [ui_mode],5
+    mov byte [ui_redraw],1
+    jmp .used
+.file_delete_key:
+    mov byte [ui_action],7
     jmp .used
 .file_back:
     mov byte [ui_mode],1
@@ -273,6 +348,76 @@ ui_keyboard32:
 .editor_shift_right_off:
     and byte [editor_shift],0xFD
     jmp .used
+.filename_keys:
+    cmp al,0x01
+    je .filename_cancel
+    test al,0x80
+    jnz .used
+    cmp al,0x0E
+    je .filename_delete
+    cmp al,0x1C
+    je .filename_submit
+    movzx edx,al
+    cmp edx,editor_scan_end-editor_scan
+    jae .used
+    mov al,[editor_scan+edx]
+    test al,al
+    jz .used
+    cmp al,'.'
+    je .filename_append
+    cmp al,'-'
+    je .filename_append
+    cmp al,'0'
+    jb .filename_letter
+    cmp al,'9'
+    jbe .filename_append
+.filename_letter:
+    cmp al,'a'
+    jb .used
+    cmp al,'z'
+    ja .used
+.filename_append:
+    mov edx,[filename_length]
+    cmp edx,15
+    jae .used
+    mov [filename_buffer+edx],al
+    inc edx
+    mov [filename_length],edx
+    mov byte [filename_buffer+edx],0
+    mov byte [ui_redraw],1
+    jmp .used
+.filename_delete:
+    cmp dword [filename_length],0
+    je .used
+    dec dword [filename_length]
+    mov edx,[filename_length]
+    mov byte [filename_buffer+edx],0
+    mov byte [ui_redraw],1
+    jmp .used
+.filename_submit:
+    cmp dword [filename_length],0
+    je .used
+    mov byte [ui_action],6
+    jmp .used
+.filename_cancel:
+    mov byte [ui_mode],3
+    mov byte [ui_redraw],1
+    jmp .used
+.delete_keys:
+    cmp al,0x01
+    je .delete_cancel
+    cmp al,0x31
+    je .delete_confirm
+    cmp al,0x1C
+    je .delete_confirm
+    jmp .used
+.delete_confirm:
+    mov byte [ui_action],8
+    jmp .used
+.delete_cancel:
+    mov byte [ui_mode],3
+    mov byte [ui_redraw],1
+    jmp .used
 .left:
     cmp byte [player_x],2
     jbe .used
@@ -337,7 +482,44 @@ ui_draw_current32:
     je file_browser_draw32
     cmp byte [ui_mode],4
     je editor_draw32
+    cmp byte [ui_mode],5
+    je filename_draw32
+    cmp byte [ui_mode],6
+    je delete_draw32
     jmp desktop_draw32
+
+filename_draw32:
+    call ui_clear32
+    mov esi,filename_title
+    mov edi,VGA+160*7+2*20
+    mov ah,0x0E
+    call ui_text32
+    mov esi,filename_label
+    mov edi,VGA+160*10+2*16
+    mov ah,0x0F
+    call ui_text32
+    mov esi,filename_buffer
+    call ui_text32
+    mov word [edi],0x7020
+    mov esi,filename_hint
+    mov edi,VGA+160*14+2*17
+    mov ah,0x0A
+    call ui_text32
+    ret
+
+delete_draw32:
+    call ui_clear32
+    mov esi,delete_title
+    mov edi,VGA+160*8+2*20
+    mov ah,0x0C
+    call ui_text32
+    mov esi,delete_name
+    call ui_text32
+    mov esi,delete_hint
+    mov edi,VGA+160*12+2*16
+    mov ah,0x0E
+    call ui_text32
+    ret
 
 file_browser_draw32:
     call ui_clear32
@@ -368,12 +550,65 @@ file_browser_draw32:
     cmp ebx,7
     jb .row
 .rows_done:
+    cmp byte [file_status],0
+    je .hint
+    mov esi,file_deleted
+    cmp byte [file_status],1
+    je .status
+    mov esi,file_exists
+    cmp byte [file_status],2
+    je .status
+    mov esi,file_create_failed
+    cmp byte [file_status],3
+    je .status
+    mov esi,file_delete_failed
+.status:
+    mov edi,VGA+160*19+2*8
+    mov ah,0x0C
+    cmp byte [file_status],1
+    jne .status_draw
+    mov ah,0x0A
+.status_draw:
+    call ui_text32
+.hint:
     mov esi,file_hint
     mov edi,VGA+160*22+2*12
     mov ah,0x0A
     call ui_text32
     mov esi,file_debug
     call ui_debug32
+    ret
+
+editor_new32:
+    mov esi,filename_buffer
+    mov edi,editor_name
+.name:
+    lodsb
+    stosb
+    test al,al
+    jnz .name
+    mov byte [editor_buffer],0
+    mov dword [editor_length],0
+    mov byte [editor_saved],1
+    mov byte [editor_shift],0
+    mov byte [ui_mode],4
+    call editor_draw32
+    ret
+
+delete_prepare32:
+    movzx eax,byte [file_selected]
+    call fs_get_name32
+    test eax,eax
+    jz .done
+    mov edi,delete_name
+.copy:
+    lodsb
+    stosb
+    test al,al
+    jnz .copy
+    mov byte [ui_mode],6
+    call delete_draw32
+.done:
     ret
 
 editor_open32:
@@ -593,14 +828,25 @@ game_hint:      db 'Left/Right: move   Catch * with ^   Q/Esc: exit',0
 score_text:     db 'Score: ',0
 game_debug:     db 'GAME ACTIVE',0
 file_title:     db 'OrangeFS File Manager',0
-file_hint:      db 'Up/Down: select   Enter: edit   Q/Esc: desktop',0
+file_hint:      db 'Up/Down select  Enter edit  N new  Delete remove  Q/Esc back',0
 file_debug:     db 'FILE MANAGER READY',0
+file_deleted:   db 'File deleted and sectors released',0
+file_exists:    db 'File already exists',0
+file_create_failed: db 'Create failed: invalid name or directory full',0
+file_delete_failed: db 'Delete failed',0
+filename_title: db 'CREATE NEW ORANGEFS FILE',0
+filename_label: db 'Filename: ',0
+filename_hint:  db 'letters/digits/dot/dash   Enter: create   Esc: cancel',0
+delete_title:   db 'DELETE FILE: ',0
+delete_hint:    db 'Enter/N: confirm deletion   Esc: cancel',0
 editor_title:   db 'EDITOR: ',0
 editor_status_saved: db '[SAVED]',0
 editor_status_modified: db '[MODIFIED]',0
 editor_hint:    db 'Type to edit   F2: save   Esc: file manager',0
 editor_debug:   db 'EDITOR READY',0
 save_debug:     db 'FILE SAVED',0
+create_debug:   db 'FILE CREATED',0
+delete_debug:   db 'FILE DELETED',0
 ui_mode:        db 0
 ui_exit:        db 0
 ui_selected:    db 0
@@ -613,12 +859,16 @@ align 4
 game_score:     dd 0
 game_last_tick: dd 0
 file_selected:  db 0
+file_status:    db 0
 editor_saved:   db 1
 editor_shift:   db 0
 align 4
 editor_length:  dd 0
 editor_name:    times 16 db 0
 editor_buffer:  times 1024 db 0
+filename_length: dd 0
+filename_buffer: times 16 db 0
+delete_name:    times 16 db 0
 
 editor_scan:
     db 0,0,'1','2','3','4','5','6','7','8','9','0','-','=',0,0

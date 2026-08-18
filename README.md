@@ -623,7 +623,7 @@ ORF3 将目录与数据分离：LBA 42 保存目录，后续为 7 个双扇区�
 
     stat big.txt
 
-预期显示 `size=700 bytes start=53 sectors=2`。自动验证同时检查偏移 511/512
+当前镜像布局下预期显示 `size=700 bytes start=88 sectors=2`。自动验证同时检查偏移 511/512
 两侧的数据：
 
     make test-fs-large
@@ -710,8 +710,8 @@ ORF8 使用目录项最后两个字节保存文件内容的 16 位加法校验�
 # 18. 完整功能冲刺：补全与启动动画
 
 为继续实现 README 中剩余的 GUI 和 Mini Game，内核装载区由 20 KiB 扩展到
-32 KiB（64 个扇区）。当前 OrangeFS 布局随之后移：主目录 LBA 66、数据区
-LBA 67–98、备份目录 LBA 99。
+32 KiB（64 个扇区）；在 GUI 文件管理器阶段进一步扩展为 40 KiB（80 个扇区）。
+当前 OrangeFS 布局为：主目录 LBA 82、数据区 LBA 83–114、备份目录 LBA 115。
 
 Shell 支持唯一前缀 Tab 补全，例如输入 `hel` 后按 Tab 会补全为 `help`。验证：
 
@@ -741,6 +741,7 @@ Shell 新增两个全屏应用：
 
     gui
     game
+    tetris
 
 `gui` 打开 VGA 彩色桌面，按 `Q` 或 `Esc` 返回 Shell。桌面分为 SYSTEM、FILES、
 APPS 三个区域，用于答辩时展示系统能力入口。
@@ -748,9 +749,14 @@ APPS 三个区域，用于答辩时展示系统能力入口。
 `game` 启动 ORANGE CATCH：使用左右方向键移动玩家 `^`，接住下落的 `*` 得分，
 按 `Q` 或 `Esc` 返回。游戏刷新由 PIT ticks 驱动，键盘由 IRQ1 实时处理。
 
+`tetris` 启动 ORANGE TETRIS：包含 I/O/T/S/Z/J/L 七类四格方块和四种旋转状态，
+左右方向键移动、上键旋转、下键软降、空格硬降。落地后方块写入 10×18 棋盘，完整行
+会被消除并累计分数；堆叠到顶部时显示 Game Over，按 Q 或 Esc 返回 Shell。
+
 自动验证：
 
     make test-ui
+    make test-tetris
 
 ------------------------------------------------------------------------
 
@@ -772,11 +778,15 @@ FILES 已升级为交互式文件管理器：上下键选择文件，Enter 打�
 支持普通字符、Shift、退格和回车，按 `F2` 将内容写回 OrangeFS，按 `Esc` 返回文件列表。
 保存后的内容可由 Shell 的 `cat` 读取，并在非快照运行中跨重启保留。
 
+文件管理器还支持完整 CRUD：按 `N` 输入文件名并新建，保存内容后按 `Delete` 进入
+删除确认页，按 Enter 确认或 Esc 取消。删除会同步更新双目录并归还文件占用的 extent。
+
 自动验证：
 
     make test-terminal
     make test-ui
     make test-ui-files
+    make test-ui-crud
 
 ------------------------------------------------------------------------
 
@@ -786,8 +796,8 @@ FILES 已升级为交互式文件管理器：上下键选择文件，Enter 打�
 
     make test-release
 
-该目标顺序执行全部 14 项 QEMU 自动测试，只有最后出现
-`OrangeOS release regression PASSED (14/14)` 才视为候选发布版。
+该目标顺序执行全部 16 项 QEMU 自动测试，只有最后出现
+`OrangeOS release regression PASSED (16/16)` 才视为候选发布版。
 
 答辩前的人工验收步骤见 `docs/RELEASE_CHECKLIST.md`，按模块阅读源码的七天路线见
 `docs/CODE_READING.md`。

@@ -15,9 +15,9 @@ global fs_get_name32
 
 %include "ata32.inc"
 
-DIR_LBA      equ 66
-BACKUP_LBA   equ 99
-DATA_LBA     equ 67
+DIR_LBA      equ 82
+BACKUP_LBA   equ 115
+DATA_LBA     equ 83
 FILE_COUNT   equ 7
 NAME_SIZE    equ 16
 ENTRY_SIZE   equ 24

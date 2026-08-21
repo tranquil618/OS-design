@@ -1,6 +1,8 @@
 ;=================================
 ; idt32.asm
-; OrangeOS 32位中断描述符表
+; OrangeOS 32 位中断描述符表（IDT）
+; 当前安装：#DE(0)、#PF(14)、IRQ0(0x20)、IRQ1(0x21) 和系统调用门(0x80)。
+; 普通门 DPL=0，仅内核可用；int 0x80 单独设为 DPL=3，允许 Ring 3 主动进入内核。
 ;=================================
 [BITS 32]
 
@@ -31,7 +33,7 @@ idt_init32:
     mov eax,isr_divide_error
     call set_idt_gate32
 
-    ; Install the page-fault exception handler (vector 14).
+    ; #PF 向量 14。CPU 进入处理器前会额外压入 page-fault error code。
     mov ebx,0x0E
     mov eax,isr_page_fault
     call set_idt_gate32
@@ -40,7 +42,7 @@ idt_init32:
     mov ebx,TEST_VECTOR
     mov eax,isr_syscall32
     call set_idt_gate32
-    ; Permit future ring-3 callers to invoke only the system-call gate.
+    ; type=32位中断门、P=1、DPL=3。用户态只能主动调用这一扇门。
     mov byte [idt_table+TEST_VECTOR*IDT_ENTRY_SIZE+5],11101110b
 
     ;安装IRQ0
@@ -74,7 +76,7 @@ set_idt_gate32:
     mov word [edi+2],CODE_SELECTOR
     ;保留字节
     mov byte [edi+4],0
-    ;P=1、DPL=0、32位中断门
+    ; P=1、DPL=0、type=1110（32 位中断门）。中断门进入时自动清 IF。
     mov byte [edi+5],10001110b
     ;处理函数地址高16位
     shr eax,16
@@ -106,27 +108,29 @@ isr_divide_error:
     jmp .halt
 
 ;=================================
-; Page Fault (vector 14)
-; CPU pushes an error code before entering this handler.
+; Page Fault（向量14）
+; CPU 栈帧：error code、EIP、CS、EFLAGS；跨特权级时后面还有 user ESP、user SS。
+; pushad 又压入 32 字节，所以 [ESP+40] 是保存的 CS，[ESP+32] 是错误码。
 ;=================================
 isr_page_fault:
     cli
     pushad
 
-    ; A CPL3 exception frame contains error/EIP/CS/EFLAGS/user ESP/user SS.
+    ; 检查故障前 CS 的 RPL。RPL=3 表示用户进程故障，可以只终止 PID4。
     mov eax,[esp+40]
     and eax,3
     cmp eax,3
     jne .kernel_fault
-    mov eax,cr2
-    mov ebx,[esp+32]
-    mov ecx,[esp+36]
+    mov eax,cr2                 ; CR2 保存导致 #PF 的线性地址
+    mov ebx,[esp+32]            ; 页故障错误码（P/W/U/RSVD/I-D）
+    mov ecx,[esp+36]            ; 故障指令 EIP
     call process_fault_current32
-    mov esp,eax
+    mov esp,eax                 ; 调度器返回下一任务的内核寄存器帧
     popad
     iretd
 
 .kernel_fault:
+    ; Ring 0 页故障意味着内核自身损坏。显示 CR2 后保护性停机，不尝试继续执行。
 
     mov esi,page_fault_message
     mov edi,0xB8000+320
@@ -180,6 +184,7 @@ page_fault_hex:
 ; Interrupt Descriptor Table
 ;=================================
 idt_table:
+    ; 256 个向量，每个门描述符 8 字节，共 2048 字节。
     times IDT_ENTRIES dq 0
 
 idt_end:

@@ -1,6 +1,8 @@
 ;=================================
 ; screen32.asm
-; OrangeOS 32位屏幕模块
+; OrangeOS 32 位 VGA 文本屏幕与回看缓冲
+; 每个 VGA 单元为 2 字节：低字节 ASCII，高字节颜色。前两行保留系统状态，
+; 第 3～25 行为 Shell 输入区。滚屏时把被卷走的行保存到 16 行 scrollback 环形窗口。
 ;=================================
 [BITS 32]
 global clear_screen32
@@ -35,15 +37,17 @@ clear_screen32:
     pop eax
     ret
 
-; Scroll rows 3-25 upward while preserving the two status rows.
+; 把第 3～25 行上移一行，同时保持顶部两行不动。
 scroll_input32:
     push eax
     push ecx
     push esi
     push edi
 
+    ; 仅在实时显示模式捕获即将被卷走的顶行；回看时不污染历史内容。
     cmp byte [scrollback_active],0
     jne .skip_capture
+    ; 历史缓冲整体左移一行，末尾放入当前输入区最上方一行。
     mov esi,scrollback_lines+160
     mov edi,scrollback_lines
     mov ecx,15*80
@@ -56,6 +60,7 @@ scroll_input32:
     inc dword [scrollback_count]
 .skip_capture:
 
+    ; VGA 输入区第 4～25 行复制到第 3～24 行，最后一行填空格。
     cld
     mov esi,VGA_MEMORY+480
     mov edi,VGA_MEMORY+320
@@ -74,6 +79,7 @@ scroll_input32:
     ret
 
 screen_scrollback_up32:
+    ; 第一次 PageUp 时保存实时屏幕，随后用最近的历史行替换输入区并画右侧滚动条。
     pushad
     mov ebx,[scrollback_count]
     test ebx,ebx
@@ -111,6 +117,7 @@ screen_scrollback_up32:
     ret
 
 screen_scrollback_down32:
+    ; PageDown 恢复进入回看前保存的 23 行实时画面。
     pushad
     cmp byte [scrollback_active],0
     je .down_done

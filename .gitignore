@@ -5,3 +5,8 @@
 *.o
 *.img
 build/
+
+# Local generated Python/rendering files
+__pycache__/
+*.py[cod]
+/tmp/
